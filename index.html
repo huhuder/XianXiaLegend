@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仙侠传奇</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- 全屏金光特效层 -->
+<div id="golden-flash"></div>
+
+<!-- 飘字容器 -->
+<div id="float-text-container"></div>
+
+<!-- 游戏主容器 -->
+<div id="game-container">
+
+    <!-- 顶部标题栏 -->
+    <div id="header">
+        <div class="game-title">仙 侠 传 奇</div>
+        <div class="resource-bar">
+            <span class="stone-icon"></span>
+            <span>灵石：</span>
+            <span id="spirit-stones-display">0</span>
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div id="main-content">
+
+        <!-- ========== 角色Tab ========== -->
+        <div class="tab-page active" id="tab-character">
+            <!-- 头像区 -->
+            <div class="avatar-section">
+                <div class="avatar-circle">🧘</div>
+                <div class="player-info">
+                    <div class="player-name" id="player-name" title="点击修改道号">无名修士</div>
+                    <div class="realm-title" id="realm-title">凡人·一层</div>
+                    <div class="power-display">战力 <span id="power-value">0</span></div>
+                </div>
+            </div>
+
+            <!-- 境界进度条 -->
+            <div class="realm-progress-bar">
+                <div class="realm-progress-fill" id="realm-progress-fill" style="width: 0%;">
+                    <div class="realm-progress-text" id="realm-progress-text">0 / 10 层</div>
+                </div>
+            </div>
+
+            <!-- 子Tab切换按钮组 -->
+            <div class="sub-tabs">
+                <button class="sub-tab-btn active" data-sub="stats">属性</button>
+                <button class="sub-tab-btn" data-sub="inventory">背包</button>
+                <button class="sub-tab-btn" data-sub="equipped">装备</button>
+            </div>
+
+            <!-- 修炼核心区 -->
+            <div class="cultivation-area" id="cultivation-area">
+                <button class="cultivate-btn" id="cultivate-btn">
+                    <span class="btn-label">修 炼</span>
+                </button>
+                <div class="cultivation-stats">
+                    <span>累计修炼 <strong id="total-cults">0</strong> 次</span>
+                </div>
+            </div>
+
+            <!-- 子页面：属性 -->
+            <div id="sub-stats" class="sub-page active">
+                <div class="stats-panel">
+                    <h3>修仙属性</h3>
+                    <div class="stat-row">
+                        <span class="stat-label">等级</span>
+                        <span class="stat-val" id="stat-level">Lv.1</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">生命</span>
+                        <div class="stat-bar-wrap"><div class="stat-bar-fill hp" id="hp-bar" style="width: 100%;"></div></div>
+                        <span class="stat-val" id="stat-hp">100</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">攻击</span>
+                        <div class="stat-bar-wrap"><div class="stat-bar-fill atk" id="atk-bar" style="width: 100%;"></div></div>
+                        <span class="stat-val" id="stat-atk">20</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">防御</span>
+                        <div class="stat-bar-wrap"><div class="stat-bar-fill def" id="def-bar" style="width: 100%;"></div></div>
+                        <span class="stat-val" id="stat-def">10</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">暴击率</span>
+                        <span class="stat-val" id="stat-crit">5%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 子页面：背包 -->
+            <div id="sub-inventory" class="sub-page">
+                <div id="inventory-list"></div>
+            </div>
+
+            <!-- 子页面：装备 -->
+            <div id="sub-equipped" class="sub-page">
+                <div id="equipped-grid"></div>
+            </div>
+
+            <!-- 子页面：宗门 -->
+            <div id="sub-sect" class="sub-page">
+                <div id="sect-content"></div>
+            </div>
+
+            <!-- 子页面：世界BOSS -->
+            <div id="sub-boss" class="sub-page">
+                <div id="boss-content"></div>
+            </div>
+
+            <!-- 经验条 -->
+            <div class="exp-bar-section">
+                <div class="exp-label">
+                    <span>修炼进度</span>
+                    <span id="exp-text">0 / 100</span>
+                </div>
+                <div class="exp-bar-outer">
+                    <div class="exp-bar-inner" id="exp-bar-inner" style="width: 0%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 战斗Tab ========== -->
+        <div class="tab-page" id="tab-battle">
+            <div id="battle-afk-area">
+                <div id="battle-zone-info"></div>
+                <div id="battle-monster-info"></div>
+                <div id="battle-log"></div>
+                <div id="battle-speed"></div>
+                <div id="battle-player-bar"></div>
+                <div style="display:flex;gap:10px;margin-top:14px;">
+                    <button id="battle-leave-btn" class="btn btn-secondary" style="flex:1;">离开</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 宗门Tab ========== -->
+        <div class="tab-page" id="tab-sect">
+            <div id="sect-page-content"></div>
+        </div>
+
+        <!-- ========== 世界Tab ========== -->
+        <div class="tab-page" id="tab-world">
+            <div id="world-page-content"></div>
+        </div>
+
+        <!-- ========== 飞升Tab ========== -->
+        <div class="tab-page" id="tab-ascend">
+            <div id="ascension-page-content"></div>
+        </div>
+
+    </div>
+
+    <!-- 底部导航栏 -->
+    <nav id="bottom-nav">
+        <div class="nav-item active" data-tab="character">
+            <span class="nav-icon">🧘</span>
+            <span class="nav-label">角色</span>
+        </div>
+        <div class="nav-item" data-tab="battle">
+            <span class="nav-icon">⚔️</span>
+            <span class="nav-label">战斗</span>
+        </div>
+        <div class="nav-item" data-tab="sect">
+            <span class="nav-icon">🏯</span>
+            <span class="nav-label">宗门</span>
+        </div>
+        <div class="nav-item" data-tab="world">
+            <span class="nav-icon">🌍</span>
+            <span class="nav-label">世界</span>
+        </div>
+        <div class="nav-item" data-tab="ascend">
+            <span class="nav-icon">✨</span>
+            <span class="nav-label">飞升</span>
+        </div>
+    </nav>
+</div>
+
+<!-- 脚本按依赖顺序加载 -->
+<script src="js/utils.js"></script>
+<script src="js/components.js"></script>
+<script src="js/cultivation.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/equipment.js"></script>
+<script src="js/sect.js"></script>
+<script src="js/worldBoss.js"></script>
+<script src="js/ascension.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

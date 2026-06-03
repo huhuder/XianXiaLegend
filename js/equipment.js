@@ -1,0 +1,1045 @@
+/* ============================================================
+   js/equipment.js — 装备系统
+   依赖 Game.data / utils.js / components.js
+   第2批：装备掉落、背包管理、装备/卸下
+   ============================================================ */
+
+var Equipment = {
+
+    /* ----------------------------------------------------------
+       装备品质常量
+       ---------------------------------------------------------- */
+    QUALITIES: [
+        { name: '凡品', color: '#cccccc', rate: 0.60,  mult: 1.0 },
+        { name: '良品', color: '#00ff88', rate: 0.25,  mult: 1.5 },
+        { name: '上品', color: '#3399ff', rate: 0.10,  mult: 2.5 },
+        { name: '极品', color: '#cc33ff', rate: 0.035, mult: 4.0 },
+        { name: '仙品', color: '#ff8800', rate: 0.013, mult: 7.0 },
+        { name: '神器', color: '#ff2222', rate: 0.002, mult: 12.0 },
+    ],
+
+    /* ----------------------------------------------------------
+       槽位定义
+       ---------------------------------------------------------- */
+    SLOTS: [
+        { name: '武器', icon: '⚔️' },
+        { name: '头盔', icon: '👑' },
+        { name: '衣服', icon: '👘' },
+        { name: '戒指', icon: '💍' },
+        { name: '项链', icon: '📿' },
+        { name: '鞋子', icon: '👢' },
+    ],
+
+    /* ----------------------------------------------------------
+       套装系统定义（4套，每套6件，覆盖全部槽位）
+       ---------------------------------------------------------- */
+    SETS: [
+        {
+            name: '青龙',
+            slots: ['青龙刃', '青龙冠', '青龙袍', '青龙戒', '青龙坠', '青龙靴'],
+            setBonuses: [
+                { count: 2, desc: '攻击+15%',  effects: { atkPct: 15 } },
+                { count: 4, desc: '暴击率+10%', effects: { critRate: 10 } },
+                { count: 6, desc: '攻击时20%概率附带一次额外伤害（值为攻击的50%）', effects: { extraDmgPct: 50 } },
+            ],
+        },
+        {
+            name: '玄武',
+            slots: ['玄武剑', '玄武盔', '玄武甲', '玄武环', '玄武珞', '玄武履'],
+            setBonuses: [
+                { count: 2, desc: '防御+15%',  effects: { defPct: 15 } },
+                { count: 4, desc: '闪避率+8%', effects: { dodgeRate: 8 } },
+                { count: 6, desc: '受击时15%概率减免50%伤害', effects: { dmgReducePct: 50, dmgReduceChance: 15 } },
+            ],
+        },
+        {
+            name: '朱雀',
+            slots: ['朱雀锋', '朱雀翎', '朱雀羽', '朱雀印', '朱雀佩', '朱雀翼'],
+            setBonuses: [
+                { count: 2, desc: '生命+15%',  effects: { hpPct: 15 } },
+                { count: 4, desc: '吸血+8%',   effects: { lifesteal: 8 } },
+                { count: 6, desc: '击杀怪物时回复20%生命', effects: { killHealPct: 20 } },
+            ],
+        },
+        {
+            name: '白虎',
+            slots: ['白虎斩', '白虎额', '白虎铠', '白虎玦', '白虎坠', '白虎踏'],
+            setBonuses: [
+                { count: 2, desc: '经验+15%',     effects: { expBonus: 15 } },
+                { count: 4, desc: '灵石+15%',     effects: { spiritBonus: 15 } },
+                { count: 6, desc: '修炼速度+20%',  effects: { cultSpeed: 20 } },
+            ],
+        },
+    ],
+
+    /* 装备生成时带套装的概率（30%） */
+    SET_CHANCE: 0.30,
+
+    /* ----------------------------------------------------------
+       特殊效果常量
+       ---------------------------------------------------------- */
+    EFFECTS: [
+        { name: '暴击率',   key: 'critRate',   min: 2,  max: 8,   desc: '+%d%暴击率' },
+        { name: '闪避率',   key: 'dodgeRate',  min: 2,  max: 6,   desc: '+%d%概率闪避' },
+        { name: '吸血',     key: 'lifesteal',   min: 3,  max: 10,  desc: '伤害的%d%转化为生命' },
+        { name: '经验加成', key: 'expBonus',    min: 5,  max: 20,  desc: '获得经验+%d%' },
+        { name: '灵石加成', key: 'spiritBonus', min: 5,  max: 20,  desc: '获得灵石+%d%' },
+        { name: '修炼速度', key: 'cultSpeed',   min: 5,  max: 15,  desc: '修炼速度+%d%' },
+        { name: 'BOSS增伤', key: 'bossDmg',    min: 10, max: 30,  desc: '对BOSS伤害+%d%' },
+        { name: '反击',     key: 'counterRate', min: 10, max: 25,  desc: '受击时%d%概率反击' },
+    ],
+
+    /* 品质对应的效果数量：[最小, 最大] */
+    QUALITY_EFFECT_COUNT: [
+        0,  // 凡品
+        1,  // 良品
+        1,  // 上品
+        2,  // 极品（1~2）
+        2,  // 仙品
+        3,  // 神器（2~3）
+    ],
+
+    /* ----------------------------------------------------------
+       名称词库
+       ---------------------------------------------------------- */
+    WORD_BANK: {
+        0: ['青冥剑', '紫电剑', '玄铁剑', '龙骨刃', '赤霄', '太阿'],
+        1: ['紫金冠', '星辰冠', '龙鳞盔', '凤翅冠'],
+        2: ['天蚕衣', '玄武甲', '金缕衣', '流云袍'],
+        3: ['乾坤戒', '须弥戒', '灵犀戒'],
+        4: ['玉龙坠', '星辰链'],
+        5: ['踏云靴', '追风履'],
+    },
+
+    /** 装备自增 ID */
+    nextId: 1,
+
+    /* ----------------------------------------------------------
+       生成随机装备
+       @param {number} mapIndex - 地图索引
+       ---------------------------------------------------------- */
+    generateEquip: function (mapIndex) {
+        // 随机品质（按概率）
+        var qualityIndex = 0;
+        var roll = Math.random();
+        var cumulative = 0;
+        for (var i = 0; i < this.QUALITIES.length; i++) {
+            cumulative += this.QUALITIES[i].rate;
+            if (roll <= cumulative) {
+                qualityIndex = i;
+                break;
+            }
+        }
+
+        // 随机槽位
+        var slotIndex = randInt(0, 5);
+        var quality = this.QUALITIES[qualityIndex];
+        var slot = this.SLOTS[slotIndex];
+
+        // 套装判定：约30%概率附带套装标签
+        var setName = null;
+        var setSlotName = null;
+        if (Math.random() < this.SET_CHANCE) {
+            var setIdx = randInt(0, this.SETS.length - 1);
+            var set = this.SETS[setIdx];
+            setName = set.name;
+            setSlotName = set.slots[slotIndex];
+        }
+
+        // 名称：有套装时用套装件名，否则从词库取词
+        var equipName;
+        if (setName && setSlotName) {
+            equipName = quality.name + '·' + setSlotName;
+        } else {
+            var names = this.WORD_BANK[slotIndex];
+            var word = names[randInt(0, names.length - 1)];
+            equipName = quality.name + '·' + word;
+            setSlotName = word; // 无套装时也记录原始词库名
+        }
+
+        // 属性计算：地图系数 × 品质倍率 × 随机基础值
+        var mapCoeff = mapIndex + 1;
+        var atkBase = randInt(3, 8);
+        var defBase = randInt(2, 6);
+        var hpBase  = randInt(15, 40);
+
+        var equip = {
+            id: this.nextId++,
+            name: equipName,
+            quality: qualityIndex,
+            slot: slotIndex,
+            atk: Math.floor(atkBase * quality.mult * mapCoeff),
+            def: Math.floor(defBase * quality.mult * mapCoeff),
+            hp:  Math.floor(hpBase  * quality.mult * mapCoeff),
+            enhance: 0,
+            mapIndex: mapIndex,
+            effects: this.rollEffects(qualityIndex),
+            setName: setName,          // 套装名，无套装为 null
+            setSlotName: setSlotName,  // 套装件名（有套装）或词库名（无套装）
+        };
+
+        return equip;
+    },
+
+    /* ----------------------------------------------------------
+       怪物死亡掉落判定（从高品质到低品质依次判定）
+       @param {number} mapIndex - 当前地图索引
+       ---------------------------------------------------------- */
+    rollDrop: function (mapIndex) {
+        // 从神器到凡品依次判定
+        for (var i = this.QUALITIES.length - 1; i >= 0; i--) {
+            if (Math.random() < this.QUALITIES[i].rate * 0.3) { // 掉落修正系数
+                // 检查背包容量
+                if (Game.data.inventory.length >= 50) {
+                    showToast('背包已满，无法拾取！', 2000);
+                    return;
+                }
+                // 生成装备（带品质倾向：命中品质的概率更高）
+                var equip = this.generateEquipWithQuality(mapIndex, i);
+                Game.data.inventory.push(equip);
+                this.showDropCard(equip);
+                Game.saveGame();
+                return;
+            }
+        }
+    },
+
+    /** 生成指定品质倾向的装备 */
+    generateEquipWithQuality: function (mapIndex, targetQuality) {
+        // 目标品质 70% 概率，其余按正态分布
+        var qualityIndex;
+        var r = Math.random();
+        if (r < 0.70) {
+            qualityIndex = targetQuality;
+        } else if (r < 0.85) {
+            qualityIndex = Math.max(0, targetQuality - 1);
+        } else if (r < 0.95) {
+            qualityIndex = Math.min(this.QUALITIES.length - 1, targetQuality + 1);
+        } else {
+            qualityIndex = randInt(0, this.QUALITIES.length - 1);
+        }
+
+        var slotIndex = randInt(0, 5);
+        var quality = this.QUALITIES[qualityIndex];
+        var slot = this.SLOTS[slotIndex];
+
+        // 套装判定
+        var setName = null;
+        var setSlotName = null;
+        if (Math.random() < this.SET_CHANCE) {
+            var setIdx = randInt(0, this.SETS.length - 1);
+            var set = this.SETS[setIdx];
+            setName = set.name;
+            setSlotName = set.slots[slotIndex];
+        }
+
+        var equipName;
+        if (setName && setSlotName) {
+            equipName = quality.name + '·' + setSlotName;
+        } else {
+            var names = this.WORD_BANK[slotIndex];
+            var word = names[randInt(0, names.length - 1)];
+            equipName = quality.name + '·' + word;
+            setSlotName = word;
+        }
+
+        var mapCoeff = mapIndex + 1;
+        var atkBase = randInt(3, 8);
+        var defBase = randInt(2, 6);
+        var hpBase  = randInt(15, 40);
+
+        return {
+            id: this.nextId++,
+            name: equipName,
+            quality: qualityIndex,
+            slot: slotIndex,
+            atk: Math.floor(atkBase * quality.mult * mapCoeff),
+            def: Math.floor(defBase * quality.mult * mapCoeff),
+            hp:  Math.floor(hpBase  * quality.mult * mapCoeff),
+            enhance: 0,
+            mapIndex: mapIndex,
+            effects: this.rollEffects(qualityIndex),
+            setName: setName,
+            setSlotName: setSlotName,
+        };
+    },
+
+    /* ----------------------------------------------------------
+       随机生成特殊效果
+       @param {number} qualityIndex - 品质索引
+       ---------------------------------------------------------- */
+    rollEffects: function (qualityIndex) {
+        var countRange = this.QUALITY_EFFECT_COUNT[qualityIndex];
+        if (countRange <= 0) return [];
+
+        // 品质 → [最小条数, 最大条数]
+        var minCount, maxCount;
+
+        if (qualityIndex === 0) { minCount = 0; maxCount = 0; }           // 凡品: 0
+        else if (qualityIndex === 1) { minCount = 1; maxCount = 1; }      // 良品: 1
+        else if (qualityIndex === 2) { minCount = 1; maxCount = 1; }      // 上品: 1
+        else if (qualityIndex === 3) { minCount = 1; maxCount = 2; }      // 极品: 1~2
+        else if (qualityIndex === 4) { minCount = 2; maxCount = 2; }      // 仙品: 2
+        else if (qualityIndex === 5) { minCount = 2; maxCount = 3; }      // 神器: 2~3
+        else { minCount = 0; maxCount = 0; }
+
+        var count = randInt(minCount, maxCount);
+        if (count <= 0) return [];
+
+        var qualityMult = this.QUALITIES[qualityIndex].mult;
+        var effects = [];
+        var pool = this.EFFECTS.slice(); // 复制池子
+
+        for (var i = 0; i < count; i++) {
+            if (pool.length === 0) break;
+            var idx = randInt(0, pool.length - 1);
+            var efDef = pool[idx];
+            // 数值 = 随机范围 × 品质倍率，取整
+            var rawVal = randInt(efDef.min, efDef.max);
+            var val = Math.max(efDef.min, Math.floor(rawVal * qualityMult * 0.5 + rawVal * 0.5));
+            effects.push({
+                name: efDef.name,
+                key: efDef.key,
+                value: val,
+            });
+            // 不允许重复效果
+            pool.splice(idx, 1);
+        }
+
+        return effects;
+    },
+
+    /* ----------------------------------------------------------
+       获取当前激活的套装加成
+       遍历已装备栏，统计各套装件数，返回所有激活的加成效果
+       ---------------------------------------------------------- */
+    getActiveSetBonuses: function () {
+        var setCounts = {}; // { 套装名: 件数 }
+        var equipped = Game.data.equipped;
+        for (var i = 0; i < 6; i++) {
+            var eq = equipped[i];
+            if (eq && eq.setName) {
+                if (!setCounts[eq.setName]) {
+                    setCounts[eq.setName] = 0;
+                }
+                setCounts[eq.setName]++;
+            }
+        }
+
+        var result = []; // [{ setName, count, bonusDesc, effects }]
+        var setNameKeys = Object.keys(setCounts);
+        for (var s = 0; s < setNameKeys.length; s++) {
+            var setName = setNameKeys[s];
+            var count = setCounts[setName];
+
+            // 找到对应套装定义
+            var setDef = null;
+            for (var d = 0; d < this.SETS.length; d++) {
+                if (this.SETS[d].name === setName) {
+                    setDef = this.SETS[d];
+                    break;
+                }
+            }
+            if (!setDef) continue;
+
+            // 遍历 setBonuses，找到已激活的加成（count >= 所需件数，取最高档）
+            var bonusDesc = '';
+            var mergedEffects = {};
+            for (var b = 0; b < setDef.setBonuses.length; b++) {
+                var bonus = setDef.setBonuses[b];
+                if (count >= bonus.count) {
+                    bonusDesc = bonus.desc;
+                    // 合并 effects
+                    var effKeys = Object.keys(bonus.effects);
+                    for (var k = 0; k < effKeys.length; k++) {
+                        mergedEffects[effKeys[k]] = bonus.effects[effKeys[k]];
+                    }
+                }
+            }
+
+            if (bonusDesc) {
+                result.push({
+                    setName: setName,
+                    count: count,
+                    bonusDesc: bonusDesc,
+                    effects: mergedEffects,
+                });
+            }
+        }
+
+        return result;
+    },
+
+    /* ----------------------------------------------------------
+       掉落提示卡片（居中显示，2秒自动消失）
+       ---------------------------------------------------------- */
+    showDropCard: function (equip) {
+        var self = this;
+        var q = this.QUALITIES[equip.quality];
+        var s = this.SLOTS[equip.slot];
+
+        // 构建效果文本
+        var effectsHtml = '';
+        if (equip.effects && equip.effects.length > 0) {
+            effectsHtml = '<div style="font-size:12px;color:#ffd700;margin-top:6px;line-height:1.7;">';
+            for (var i = 0; i < equip.effects.length; i++) {
+                var ef = equip.effects[i];
+                effectsHtml += '✨ ' + ef.name + ' +' + ef.value + '%<br>';
+            }
+            effectsHtml += '</div>';
+        }
+
+        // 创建遮罩+卡片
+        var overlay = document.createElement('div');
+        overlay.className = 'drop-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
+            'background:rgba(0,0,0,0.6);z-index:9999;display:flex;' +
+            'align-items:center;justify-content:center;';
+
+        var card = document.createElement('div');
+        card.className = 'drop-card';
+        card.style.cssText = 'background:rgba(22,33,62,0.95);border:2px solid ' + q.color +
+            ';border-radius:16px;padding:24px 28px;text-align:center;' +
+            'box-shadow:0 0 30px ' + q.color + ', 0 0 60px ' + q.color + '44;' +
+            'max-width:300px;animation:dropCardIn 0.3s ease-out;';
+
+        card.innerHTML = '<div style="font-size:20px;color:' + q.color + ';font-weight:bold;margin-bottom:4px;">' +
+            '🎁 获得装备</div>' +
+            '<div style="font-size:26px;color:' + q.color + ';font-weight:bold;margin:8px 0;">' +
+            s.icon + ' ' + equip.name + '</div>' +
+            '<div style="font-size:14px;color:' + q.color + ';margin-bottom:12px;">' +
+            '【' + q.name + '】' + s.name + '</div>' +
+            '<div style="font-size:13px;color:#a09080;line-height:1.8;">' +
+            '⚔️ 攻击 +' + equip.atk + '<br>' +
+            '🛡️ 防御 +' + equip.def + '<br>' +
+            '❤️ 生命 +' + equip.hp + '</div>' +
+            effectsHtml;
+
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        // 点击或2秒后消失
+        var removeFn = function () {
+            if (overlay.parentNode) {
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity 0.3s';
+                setTimeout(function () {
+                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                }, 300);
+            }
+        };
+
+        overlay.addEventListener('click', removeFn);
+        setTimeout(removeFn, 2000);
+    },
+
+    /* ----------------------------------------------------------
+       渲染背包列表
+       ---------------------------------------------------------- */
+    renderInventory: function () {
+        var container = document.getElementById('inventory-list');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        var inventory = Game.data.inventory;
+        if (!inventory || inventory.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:var(--text-muted);' +
+                'padding:30px;">🎒 背包空空如也<br><span style="font-size:12px;">去历练吧，道友！</span></div>';
+            return;
+        }
+
+        // 容量提示
+        var capHint = document.createElement('div');
+        capHint.style.cssText = 'text-align:right;color:var(--text-muted);font-size:11px;margin-bottom:6px;';
+        capHint.textContent = inventory.length + ' / 50';
+        container.appendChild(capHint);
+
+        var self = this;
+        for (var i = 0; i < inventory.length; i++) {
+            (function (idx) {
+                var eq = inventory[idx];
+                var q = self.QUALITIES[eq.quality];
+                var s = self.SLOTS[eq.slot];
+
+                var cardEl = createCard(
+                    '<span style="font-size:14px;">' + s.icon + '</span> ' + eq.name +
+                    (eq.enhance > 0
+                        ? ' <span style="font-size:10px;background:#ffd700;color:#1a1a2e;' +
+                          'padding:1px 4px;border-radius:4px;font-weight:bold;">+' + eq.enhance + '</span>'
+                        : ''),
+                    '<div style="font-size:11px;color:' + q.color + ';margin:2px 0;">【' + q.name + '】' + s.name + '</div>' +
+                    '<div style="font-size:11px;color:#a09080;">' +
+                    '攻击+' + eq.atk + ' 防御+' + eq.def + ' 生命+' + eq.hp + '</div>',
+                    '<div style="display:flex;gap:6px;">' +
+                    '<button class="inv-equip-btn" data-idx="' + idx + '" ' +
+                    'style="flex:1;padding:6px;border:1px solid ' + q.color + ';border-radius:6px;' +
+                    'background:rgba(0,0,0,0.3);color:' + q.color + ';font-size:12px;cursor:pointer;">装备</button>' +
+                    '<button class="inv-sell-btn" data-idx="' + idx + '" ' +
+                    'style="padding:6px 10px;border:1px solid #555;border-radius:6px;' +
+                    'background:rgba(0,0,0,0.3);color:#999;font-size:12px;cursor:pointer;">售</button>' +
+                    '</div>'
+                );
+
+                cardEl.style.cssText = 'border:1px solid ' + q.color +
+                    ';border-radius:10px;padding:10px 12px;margin-bottom:8px;' +
+                    'background:rgba(15,52,96,0.4);' +
+                    'box-shadow:0 0 6px ' + q.color + '22;cursor:pointer;';
+                container.appendChild(cardEl);
+
+                // 卡片点击显示详情（按钮点击会阻止冒泡）
+                cardEl.addEventListener('click', function (e) {
+                    if (e.target.tagName !== 'BUTTON') {
+                        self.showDetail(eq);
+                    }
+                });
+            })(i);
+        }
+
+        // 绑定事件
+        var self = this;
+        setTimeout(function () {
+            var equipBtns = container.querySelectorAll('.inv-equip-btn');
+            for (var i = 0; i < equipBtns.length; i++) {
+                equipBtns[i].addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    var idx = parseInt(this.getAttribute('data-idx'));
+                    self.equipItem(idx);
+                });
+            }
+            var sellBtns = container.querySelectorAll('.inv-sell-btn');
+            for (var j = 0; j < sellBtns.length; j++) {
+                sellBtns[j].addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    var idx = parseInt(this.getAttribute('data-idx'));
+                    self.sellItem(idx);
+                });
+            }
+        }, 0);
+    },
+
+    /* ----------------------------------------------------------
+       装备到槽位
+       @param {number} invIndex - 背包索引
+       ---------------------------------------------------------- */
+    equipItem: function (invIndex) {
+        var equip = Game.data.inventory[invIndex];
+        if (!equip) return;
+
+        var slotIndex = equip.slot;
+
+        // 如果该槽位已有装备，先卸下旧的
+        if (Game.data.equipped[slotIndex]) {
+            var old = Game.data.equipped[slotIndex];
+            Game.data.inventory.push(old);
+            // 移除旧装备属性
+            Game.data.hp     -= old.hp;
+            Game.data.attack -= old.atk;
+            Game.data.defense -= old.def;
+        }
+
+        // 卸下背包中的这件
+        Game.data.equipped[slotIndex] = equip;
+        Game.data.inventory.splice(invIndex, 1);
+
+        // 添加属性
+        Game.data.hp     += equip.hp;
+        Game.data.attack += equip.atk;
+        Game.data.defense += equip.def;
+
+        // 更新UI
+        Cultivation.updateAllUI();
+        this.renderInventory();
+        this.renderEquipped();
+        Game.saveGame();
+
+        showToast('装备「' + equip.name + '」', 1500);
+    },
+
+    /* ----------------------------------------------------------
+       卸下装备
+       @param {number} slotIndex - 槽位索引
+       ---------------------------------------------------------- */
+    unequipItem: function (slotIndex) {
+        var equip = Game.data.equipped[slotIndex];
+        if (!equip) return;
+
+        // 检查背包容量
+        if (Game.data.inventory.length >= 50) {
+            showToast('背包已满，无法卸下', 2000);
+            return;
+        }
+
+        Game.data.equipped[slotIndex] = null;
+        Game.data.inventory.push(equip);
+
+        // 移除属性
+        Game.data.hp     -= equip.hp;
+        Game.data.attack -= equip.atk;
+        Game.data.defense -= equip.def;
+
+        Cultivation.updateAllUI();
+        this.renderInventory();
+        this.renderEquipped();
+        Game.saveGame();
+
+        showToast('卸下「' + equip.name + '」', 1500);
+    },
+
+    /* ----------------------------------------------------------
+       查看装备详情弹窗
+       @param {object} equip - 装备对象
+       @param {number} [slotIndex] - 已装备槽位索引（可选）
+       ---------------------------------------------------------- */
+    showDetail: function (equip, slotIndex) {
+        // 清理已有的详情弹窗（防止多个弹窗叠加导致ID冲突卡死）
+        var existingOverlays = document.querySelectorAll('.equip-detail-overlay');
+        for (var o = 0; o < existingOverlays.length; o++) {
+            if (existingOverlays[o].parentNode) {
+                existingOverlays[o].parentNode.removeChild(existingOverlays[o]);
+            }
+        }
+
+        var self = this;
+        var q = this.QUALITIES[equip.quality];
+        var s = this.SLOTS[equip.slot];
+
+        // 构建效果列表 HTML
+        var effectsHtml = '';
+        if (equip.effects && equip.effects.length > 0) {
+            effectsHtml = '<div style="margin-top:12px;">' +
+                '<div style="font-size:13px;color:#ffd700;font-weight:bold;margin-bottom:6px;">特殊效果</div>';
+            for (var i = 0; i < equip.effects.length; i++) {
+                var ef = equip.effects[i];
+                effectsHtml += '<div style="font-size:12px;color:#ffd700;padding:3px 0;border-bottom:1px solid rgba(255,215,0,0.1);">' +
+                    '✦ ' + ef.name + ' +' + ef.value + '%</div>';
+            }
+            effectsHtml += '</div>';
+        } else {
+            effectsHtml = '<div style="margin-top:12px;font-size:12px;color:#6a5f50;">无特殊效果</div>';
+        }
+
+        // 强化区域
+        var enhanceLevel = equip.enhance || 0;
+        var qualityMult = this.QUALITIES[equip.quality].mult;
+        var enhanceCost = Math.floor((enhanceLevel + 1) * 50 * qualityMult);
+        var enhanceRate = Math.max(30, 100 - enhanceLevel * 5);
+        var canEnhance = enhanceLevel < EQUIP_MAX_ENHANCE;
+
+        var enhanceHtml = '';
+        if (canEnhance) {
+            enhanceHtml = '<div style="margin-top:12px;background:rgba(255,215,0,0.05);' +
+                'border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:10px;">' +
+                '<div style="font-size:13px;color:#ffd700;font-weight:bold;margin-bottom:6px;">强化</div>' +
+                '<div style="font-size:12px;color:#a09080;line-height:1.8;">' +
+                '当前：+' + enhanceLevel + ' 级<br>' +
+                '消耗：' + formatNumber(enhanceCost) + ' 灵石<br>' +
+                '成功率：' + enhanceRate + '%</div>' +
+                '<button id="detail-enhance-btn" class="enhance-btn" ' +
+                'style="width:100%;margin-top:8px;padding:8px;border:1px solid #ffd700;' +
+                'border-radius:8px;background:rgba(255,215,0,0.1);color:#ffd700;' +
+                'font-size:14px;font-family:inherit;cursor:pointer;">强化</button></div>';
+        } else {
+            enhanceHtml = '<div style="margin-top:12px;background:rgba(255,215,0,0.05);' +
+                'border:1px solid rgba(255,215,0,0.15);border-radius:10px;padding:10px;">' +
+                '<div style="font-size:13px;color:#ffd700;font-weight:bold;margin-bottom:4px;">强化 MAX</div>' +
+                '<div style="font-size:12px;color:#a09080;">已达最高强化等级 +' + EQUIP_MAX_ENHANCE + '</div></div>';
+        }
+
+        // 按钮区域
+        var btnHtml = '';
+        if (slotIndex !== undefined) {
+            btnHtml = '<button id="detail-unequip-btn" ' +
+                'style="width:100%;margin-top:8px;padding:10px;border:1px solid ' + q.color +
+                ';border-radius:8px;background:rgba(0,0,0,0.3);color:' + q.color +
+                ';font-size:14px;font-family:inherit;cursor:pointer;">卸下装备</button>';
+        } else {
+            btnHtml = '<button id="detail-equip-btn" ' +
+                'style="width:100%;margin-top:8px;padding:10px;border:1px solid ' + q.color +
+                ';border-radius:8px;background:rgba(0,0,0,0.3);color:' + q.color +
+                ';font-size:14px;font-family:inherit;cursor:pointer;">装备</button>';
+        }
+
+        // 创建遮罩
+        var overlay = document.createElement('div');
+        overlay.className = 'equip-detail-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
+            'background:rgba(0,0,0,0.6);z-index:9999;display:flex;' +
+            'align-items:center;justify-content:center;';
+
+        // 创建详情卡片
+        var card = document.createElement('div');
+        card.className = 'equip-detail-card';
+        card.style.cssText = 'background:rgba(22,33,62,0.97);border:2px solid ' + q.color +
+            ';border-radius:16px;padding:24px 28px;text-align:center;' +
+            'box-shadow:0 0 30px ' + q.color + ', 0 0 60px ' + q.color + '44;' +
+            'max-width:300px;width:90%;animation:equipDetailIn 0.3s ease-out;' +
+            'position:relative;';
+
+        card.innerHTML =
+            // 关闭按钮
+            '<div id="detail-close-btn" ' +
+            'style="position:absolute;top:10px;right:14px;font-size:20px;color:#888;' +
+            'cursor:pointer;line-height:1;">✕</div>' +
+
+            // 装备名
+            '<div style="font-size:24px;color:' + q.color + ';font-weight:bold;margin:4px 0;">' +
+            s.icon + ' ' + equip.name + '</div>' +
+
+            // 品质和槽位
+            '<div style="font-size:14px;color:' + q.color + ';margin-bottom:4px;">' +
+            '【' + q.name + '】' + s.name + '</div>' +
+
+            // 套装信息
+            (equip.setName ? '<div style="font-size:13px;color:#00ff88;margin-bottom:10px;' +
+                'background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);' +
+                'border-radius:6px;padding:4px 10px;display:inline-block;">套装：' + equip.setName + '</div>' : '') +
+
+            // 基础属性
+            '<div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:12px;">' +
+            '<div style="font-size:12px;color:#a09080;margin-bottom:6px;">基础属性</div>' +
+            '<div style="display:flex;justify-content:space-around;font-size:14px;color:#e0d5c1;">' +
+            '<div>⚔️ 攻击<br><span style="color:#e67e22;font-weight:bold;">' + equip.atk + '</span></div>' +
+            '<div>🛡️ 防御<br><span style="color:#3498db;font-weight:bold;">' + equip.def + '</span></div>' +
+            '<div>❤️ 生命<br><span style="color:#e74c3c;font-weight:bold;">' + equip.hp + '</span></div>' +
+            '</div></div>' +
+
+            // 特殊效果
+            effectsHtml +
+
+            // 强化区域
+            enhanceHtml +
+
+            // 操作按钮
+            btnHtml;
+
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        // 关闭函数
+        var removeOverlay = function () {
+            if (overlay.parentNode) {
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity 0.25s';
+                setTimeout(function () {
+                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                }, 250);
+            }
+        };
+
+        // 点击遮罩关闭
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) removeOverlay();
+        });
+
+        // 关闭按钮
+        var closeBtn = document.getElementById('detail-close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                removeOverlay();
+            });
+        }
+
+        // 装备/卸下按钮
+        if (slotIndex !== undefined) {
+            var unequipBtn = document.getElementById('detail-unequip-btn');
+            if (unequipBtn) {
+                unequipBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    removeOverlay();
+                    self.unequipItem(slotIndex);
+                });
+            }
+        } else {
+            var equipBtn = document.getElementById('detail-equip-btn');
+            if (equipBtn) {
+                equipBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    var invIdx = -1;
+                    for (var i = 0; i < Game.data.inventory.length; i++) {
+                        if (Game.data.inventory[i].id === equip.id) {
+                            invIdx = i;
+                            break;
+                        }
+                    }
+                    removeOverlay();
+                    if (invIdx >= 0) {
+                        self.equipItem(invIdx);
+                    }
+                });
+            }
+        }
+
+        // 强化按钮
+        var enhanceBtn = document.getElementById('detail-enhance-btn');
+        if (enhanceBtn) {
+            enhanceBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var result = self.enhanceEquip(equip, slotIndex !== undefined ? slotIndex : -1);
+                removeOverlay();
+                // 强化后重新打开详情弹窗
+                if (result) {
+                    var updatedEquip;
+                    if (slotIndex !== undefined) {
+                        updatedEquip = Game.data.equipped[slotIndex];
+                    } else {
+                        for (var k = 0; k < Game.data.inventory.length; k++) {
+                            if (Game.data.inventory[k].id === equip.id) {
+                                updatedEquip = Game.data.inventory[k];
+                                break;
+                            }
+                        }
+                    }
+                    if (updatedEquip) {
+                        // 等待旧弹窗完全移除（250ms 过渡 + 缓冲）后再打开新弹窗，避免 ID 冲突
+                        setTimeout(function () { self.showDetail(updatedEquip, slotIndex); }, 300);
+                    }
+                }
+            });
+        }
+    },
+
+    /* ----------------------------------------------------------
+       装备强化
+       @param {object} equip - 装备对象（引用或副本，内部会查找实际引用）
+       @param {number} slotIndex - 已装备槽位索引（>=0），背包中为 -1
+       @returns {boolean} 是否强化成功
+       ---------------------------------------------------------- */
+    enhanceEquip: function (equip, slotIndex) {
+        var level = equip.enhance || 0;
+        if (level >= EQUIP_MAX_ENHANCE) {
+            showToast('已达最高强化等级 +' + EQUIP_MAX_ENHANCE, 2000);
+            return false;
+        }
+
+        var qualityMult = this.QUALITIES[equip.quality].mult;
+        var cost = Math.floor((level + 1) * 50 * qualityMult);
+
+        if (Game.data.spiritStones < cost) {
+            showToast('灵石不足！需要 ' + formatNumber(cost) + ' 灵石', 2000);
+            return false;
+        }
+
+        // 定位实际对象引用（showDetail 传入的可能是查找后的副本）
+        if (slotIndex >= 0) {
+            equip = Game.data.equipped[slotIndex];
+        } else {
+            var invIdx = -1;
+            for (var i = 0; i < Game.data.inventory.length; i++) {
+                if (Game.data.inventory[i].id === equip.id) {
+                    invIdx = i;
+                    break;
+                }
+            }
+            if (invIdx < 0) return false;
+            equip = Game.data.inventory[invIdx];
+        }
+
+        level = equip.enhance || 0;
+        var baseRate = Math.max(30, 100 - level * 5);
+        var successRate = baseRate + (Game.data.enhanceRateBuff || 0);
+        var success = Math.random() * 100 < successRate;
+
+        Game.data.spiritStones -= cost;
+
+        // 消耗强化符 Buff（单次有效）
+        Game.data.enhanceRateBuff = 0;
+
+        if (success) {
+            var atkGain = Math.max(1, Math.floor(equip.atk * 0.08));
+            var defGain = Math.max(1, Math.floor(equip.def * 0.08));
+            var hpGain  = Math.max(1, Math.floor(equip.hp * 0.08));
+
+            equip.atk += atkGain;
+            equip.def += defGain;
+            equip.hp  += hpGain;
+            equip.enhance = level + 1;
+
+            if (slotIndex >= 0) {
+                Game.data.attack += atkGain;
+                Game.data.defense += defGain;
+                Game.data.hp     += hpGain;
+            }
+
+            showToast('强化成功！+' + equip.enhance, 1500);
+        } else {
+            if (level >= 5) {
+                var atkLoss = Math.max(1, Math.floor(equip.atk * 0.08));
+                var defLoss = Math.max(1, Math.floor(equip.def * 0.08));
+                var hpLoss  = Math.max(1, Math.floor(equip.hp * 0.08));
+
+                equip.atk -= atkLoss;
+                equip.def -= defLoss;
+                equip.hp  -= hpLoss;
+                equip.enhance = level - 1;
+
+                if (slotIndex >= 0) {
+                    Game.data.attack -= atkLoss;
+                    Game.data.defense -= defLoss;
+                    Game.data.hp     -= hpLoss;
+                }
+
+                showToast('强化失败，等级 ' + level + ' → ' + (level - 1), 2000);
+            } else {
+                showToast('强化失败，无惩罚', 2000);
+            }
+        }
+
+        Game.updatePower();
+        Cultivation.updateAllUI();
+        this.renderInventory();
+        this.renderEquipped();
+        Game.saveGame();
+
+        return success;
+    },
+
+    /* ----------------------------------------------------------
+       出售装备
+       @param {number} invIndex - 背包索引
+       ---------------------------------------------------------- */
+    sellItem: function (invIndex) {
+        var equip = Game.data.inventory[invIndex];
+        if (!equip) return;
+
+        var price = Math.floor(this.QUALITIES[equip.quality].mult * 50);
+        Game.data.inventory.splice(invIndex, 1);
+        Game.addSpirit(price);
+
+        this.renderInventory();
+        Game.saveGame();
+
+        showToast('售出「' + equip.name + '」，获得 ' + price + ' 灵石', 2000);
+    },
+
+    /* ----------------------------------------------------------
+       渲染已装备区（6槽位网格）
+       ---------------------------------------------------------- */
+    renderEquipped: function () {
+        var self = this;
+        var container = document.getElementById('equipped-grid');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        // 战力加成汇总
+        var totalAtk = 0, totalDef = 0, totalHp = 0;
+        for (var i = 0; i < 6; i++) {
+            if (Game.data.equipped[i]) {
+                totalAtk += Game.data.equipped[i].atk;
+                totalDef += Game.data.equipped[i].def;
+                totalHp  += Game.data.equipped[i].hp;
+            }
+        }
+        if (totalAtk > 0 || totalDef > 0 || totalHp > 0) {
+            var bonusDiv = document.createElement('div');
+            bonusDiv.style.cssText = 'text-align:center;color:#d4a574;font-size:12px;margin-bottom:10px;';
+            bonusDiv.textContent = '装备加成：攻击+' + totalAtk + ' 防御+' + totalDef + ' 生命+' + totalHp;
+            container.appendChild(bonusDiv);
+        }
+
+        // 套装汇总
+        var activeSets = self.getActiveSetBonuses();
+        if (activeSets.length > 0) {
+            var setSummary = document.createElement('div');
+            setSummary.style.cssText = 'text-align:center;margin-bottom:10px;';
+            for (var si = 0; si < activeSets.length; si++) {
+                var as = activeSets[si];
+                var badge = document.createElement('span');
+                badge.style.cssText = 'display:inline-block;margin:2px 4px;padding:3px 10px;' +
+                    'background:rgba(0,255,136,0.12);border:1px solid rgba(0,255,136,0.3);' +
+                    'border-radius:8px;font-size:12px;color:#00ff88;';
+                badge.textContent = as.setName + ' ' + as.count + '/6 · ' + as.bonusDesc;
+                setSummary.appendChild(badge);
+            }
+            container.appendChild(setSummary);
+        }
+
+        // 槽位网格
+        var grid = document.createElement('div');
+        grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;';
+        var self = this;
+
+        for (var j = 0; j < 6; j++) {
+            (function (idx) {
+                var slot = self.SLOTS[idx];
+                var equip = Game.data.equipped[idx];
+
+                var slotCard = document.createElement('div');
+                if (equip) {
+                    var q = self.QUALITIES[equip.quality];
+                    slotCard.style.cssText = 'border:1px solid ' + q.color +
+                        ';border-radius:8px;padding:8px;text-align:center;' +
+                        'background:rgba(15,52,96,0.3);cursor:pointer;' +
+                        'box-shadow:0 0 4px ' + q.color + '22;';
+                    slotCard.innerHTML = '<div style="font-size:20px;">' + slot.icon + '</div>' +
+                        '<div style="font-size:10px;color:#a09080;">' + slot.name + '</div>' +
+                        '<div style="font-size:11px;color:' + q.color + ';font-weight:bold;">' +
+                        equip.name.substring(0, 6) +
+                        (equip.enhance > 0 ? '<span style="font-size:9px;background:#ffd700;color:#1a1a2e;' +
+                            'padding:1px 4px;border-radius:4px;margin-left:4px;font-weight:bold;">+' + equip.enhance + '</span>' : '') +
+                        '</div>' +
+                        '<div style="font-size:9px;color:#6a5f50;">攻击+' + equip.atk +
+                        ' 防御+' + equip.def + ' 生命+' + equip.hp + '</div>';
+                    slotCard.title = '点击查看 ' + equip.name;
+                    slotCard.addEventListener('click', function () {
+                        self.showDetail(equip, idx);
+                    });
+                } else {
+                    slotCard.style.cssText = 'border:1px dashed #3a3a4a;border-radius:8px;' +
+                        'padding:8px;text-align:center;background:rgba(10,10,25,0.4);';
+                    slotCard.innerHTML = '<div style="font-size:20px;">' + slot.icon + '</div>' +
+                        '<div style="font-size:10px;color:#555;">' + slot.name + '</div>' +
+                        '<div style="font-size:11px;color:#444;">空</div>';
+                }
+                grid.appendChild(slotCard);
+            })(j);
+        }
+        container.appendChild(grid);
+    },
+
+    /* ----------------------------------------------------------
+       初始化子Tab事件绑定
+       ---------------------------------------------------------- */
+    init: function () {
+        var self = this;
+        // 子Tab按钮事件
+        var subBtns = document.querySelectorAll('.sub-tab-btn');
+        for (var i = 0; i < subBtns.length; i++) {
+            subBtns[i].addEventListener('click', function () {
+                var sub = this.getAttribute('data-sub');
+
+                // 切换按钮高亮
+                var allBtns = document.querySelectorAll('.sub-tab-btn');
+                for (var b = 0; b < allBtns.length; b++) {
+                    allBtns[b].classList.remove('active');
+                }
+                this.classList.add('active');
+
+                // 切换子页面
+                var allPages = document.querySelectorAll('.sub-page');
+                for (var p = 0; p < allPages.length; p++) {
+                    allPages[p].classList.remove('active');
+                }
+                var target = document.getElementById('sub-' + sub);
+                if (target) target.classList.add('active');
+
+                // 控制修炼区和进度条（仅在属性页显示）
+                var cultArea = document.getElementById('cultivation-area');
+                var realmBar = document.querySelector('.realm-progress-bar');
+                var showCult = (sub === 'stats');
+                if (cultArea) cultArea.style.display = showCult ? '' : 'none';
+                if (realmBar) realmBar.style.display = showCult ? '' : 'none';
+
+                // 渲染对应内容
+                if (sub === 'inventory') {
+                    self.renderInventory();
+                } else if (sub === 'equipped') {
+                    self.renderEquipped();
+                }
+            });
+        }
+    },
+
+};
