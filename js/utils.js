@@ -100,7 +100,8 @@ function generateId() {
  */
 function calcRequiredExp(realmIndex, layer) {
     const mult = getRealmMultiplier(realmIndex);
-    return 100 * mult * (layer + 1);
+    const globalLevel = realmIndex * 10 + layer + 1;  // 全局等级 1~100，保证经验单调递增
+    return 100 * mult * globalLevel;
 }
 
 /**

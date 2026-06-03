@@ -158,7 +158,7 @@ var Equipment = {
         }
 
         // 属性计算：地图系数 × 品质倍率 × 随机基础值
-        var mapCoeff = mapIndex + 1;
+        var mapCoeff = getRealmMultiplier(mapIndex);  // 1, 2, 4, 8, 16, 32
         var atkBase = randInt(3, 8);
         var defBase = randInt(2, 6);
         var hpBase  = randInt(15, 40);
@@ -186,21 +186,30 @@ var Equipment = {
        @param {number} mapIndex - 当前地图索引
        ---------------------------------------------------------- */
     rollDrop: function (mapIndex) {
-        // 从神器到凡品依次判定
+        // 标准权重法：计算所有品质的权重总和，累积权重匹配
+        var totalWeight = 0;
+        for (var i = 0; i < this.QUALITIES.length; i++) {
+            totalWeight += this.QUALITIES[i].rate * 0.3;
+        }
+        var roll = Math.random() * totalWeight;
+        var cumulative = 0;
+        var selectedQuality = -1;
         for (var i = this.QUALITIES.length - 1; i >= 0; i--) {
-            if (Math.random() < this.QUALITIES[i].rate * 0.3) { // 掉落修正系数
-                // 检查背包容量
-                if (Game.data.inventory.length >= 50) {
-                    showToast('背包已满，无法拾取！', 2000);
-                    return;
-                }
-                // 生成装备（带品质倾向：命中品质的概率更高）
-                var equip = this.generateEquipWithQuality(mapIndex, i);
-                Game.data.inventory.push(equip);
-                this.showDropCard(equip);
-                Game.saveGame();
+            cumulative += this.QUALITIES[i].rate * 0.3;
+            if (roll < cumulative) {
+                selectedQuality = i;
+                break;
+            }
+        }
+        if (selectedQuality >= 0) {
+            if (Game.data.inventory.length >= 50) {
+                showToast('背包已满，无法拾取！', 2000);
                 return;
             }
+            var equip = this.generateEquipWithQuality(mapIndex, selectedQuality);
+            Game.data.inventory.push(equip);
+            this.showDropCard(equip);
+            Game.saveGame();
         }
     },
 
@@ -462,6 +471,22 @@ var Equipment = {
                 var q = self.QUALITIES[eq.quality];
                 var s = self.SLOTS[eq.slot];
 
+                // 与已装备同槽位装备对比
+                var compareHtml = '';
+                var equipped = Game.data.equipped[eq.slot];
+                if (equipped) {
+                    var dAtk = eq.atk - equipped.atk;
+                    var dDef = eq.def - equipped.def;
+                    var dHp = eq.hp - equipped.hp;
+                    var diffs = [];
+                    if (dAtk !== 0) diffs.push((dAtk > 0 ? '<span style="color:#00ff88;">攻+' : '<span style="color:#ff4444;">攻') + dAtk + '</span>');
+                    if (dDef !== 0) diffs.push((dDef > 0 ? '<span style="color:#00ff88;">防+' : '<span style="color:#ff4444;">防') + dDef + '</span>');
+                    if (dHp !== 0) diffs.push((dHp > 0 ? '<span style="color:#00ff88;">命+' : '<span style="color:#ff4444;">命') + dHp + '</span>');
+                    compareHtml = '<div style="font-size:10px;margin-top:4px;border-top:1px solid rgba(255,255,255,0.1);padding-top:3px;">' +
+                        (diffs.length > 0 ? '对比已装备：' + diffs.join(' ') : '<span style="color:#888;">与已装备相同</span>') +
+                        '</div>';
+                }
+
                 var cardEl = createCard(
                     '<span style="font-size:14px;">' + s.icon + '</span> ' + eq.name +
                     (eq.enhance > 0
@@ -470,7 +495,8 @@ var Equipment = {
                         : ''),
                     '<div style="font-size:11px;color:' + q.color + ';margin:2px 0;">【' + q.name + '】' + s.name + '</div>' +
                     '<div style="font-size:11px;color:#a09080;">' +
-                    '攻击+' + eq.atk + ' 防御+' + eq.def + ' 生命+' + eq.hp + '</div>',
+                    '攻击+' + eq.atk + ' 防御+' + eq.def + ' 生命+' + eq.hp + '</div>' +
+                    compareHtml,
                     '<div style="display:flex;gap:6px;">' +
                     '<button class="inv-equip-btn" data-idx="' + idx + '" ' +
                     'style="flex:1;padding:6px;border:1px solid ' + q.color + ';border-radius:6px;' +
@@ -846,6 +872,11 @@ var Equipment = {
         // 消耗强化符 Buff（单次有效）
         Game.data.enhanceRateBuff = 0;
 
+        // 强化前保存当前属性，失败时直接恢复避免数值缩水
+        var preAtk = equip.atk;
+        var preDef = equip.def;
+        var preHp  = equip.hp;
+
         if (success) {
             var atkGain = Math.max(1, Math.floor(equip.atk * 0.08));
             var defGain = Math.max(1, Math.floor(equip.def * 0.08));
@@ -865,20 +896,11 @@ var Equipment = {
             showToast('强化成功！+' + equip.enhance, 1500);
         } else {
             if (level >= 5) {
-                var atkLoss = Math.max(1, Math.floor(equip.atk * 0.08));
-                var defLoss = Math.max(1, Math.floor(equip.def * 0.08));
-                var hpLoss  = Math.max(1, Math.floor(equip.hp * 0.08));
-
-                equip.atk -= atkLoss;
-                equip.def -= defLoss;
-                equip.hp  -= hpLoss;
+                // 恢复强化前的属性值，杜绝 +8%/-8% 基于不同基数导致的数值缩水
+                equip.atk = preAtk;
+                equip.def = preDef;
+                equip.hp  = preHp;
                 equip.enhance = level - 1;
-
-                if (slotIndex >= 0) {
-                    Game.data.attack -= atkLoss;
-                    Game.data.defense -= defLoss;
-                    Game.data.hp     -= hpLoss;
-                }
 
                 showToast('强化失败，等级 ' + level + ' → ' + (level - 1), 2000);
             } else {

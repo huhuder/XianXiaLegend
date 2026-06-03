@@ -4,6 +4,49 @@
    进入即战斗，随机小怪/BOSS，不离开就一直挂机
    ============================================================ */
 
+/**
+ * 汇总所有已装备装备的特殊效果和套装加成
+ * 每 tick 调用一次，避免重复遍历装备数组
+ * @returns {object} 汇总后的效果对象
+ */
+function getEquipAndSetEffects() {
+    var result = {
+        critRate: 0, dodgeRate: 0, lifesteal: 0, bossDmg: 0, counterRate: 0,
+        extraDmgPct: 0, extraDmgChance: 0, dmgReducePct: 0, dmgReduceChance: 0,
+        killHealPct: 0, expBonus: 0, spiritBonus: 0, cultSpeed: 0
+    };
+
+    // 遍历已装备的6个槽位
+    if (Game.data && Game.data.equipped) {
+        for (var i = 0; i < 6; i++) {
+            var eq = Game.data.equipped[i];
+            if (eq && eq.effects) {
+                for (var j = 0; j < eq.effects.length; j++) {
+                    var ef = eq.effects[j];
+                    if (result[ef.key] !== undefined) {
+                        result[ef.key] += ef.value;
+                    }
+                }
+            }
+        }
+    }
+
+    // 遍历套装加成
+    if (typeof Equipment !== 'undefined' && Equipment.getActiveSetBonuses) {
+        var bonuses = Equipment.getActiveSetBonuses();
+        for (var b = 0; b < bonuses.length; b++) {
+            var eff = bonuses[b].effects;
+            for (var key in eff) {
+                if (result[key] !== undefined) {
+                    result[key] += eff[key];
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
 var Battle = {
 
     /* ----------------------------------------------------------
@@ -375,6 +418,9 @@ var Battle = {
         var buffBonus = (typeof Sect !== 'undefined' && Sect.getActiveBuffs)
             ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0, hpPct: 0, enhanceRate: 0 };
 
+        // 读取装备和套装效果
+        var effects = getEquipAndSetEffects();
+
         // 角色攻击（含宗门加成）
         var effectiveAtk = Math.floor(Game.data.attack * (1 + sectBonus.atkPct / 100 + buffBonus.atkPct / 100));
         var effectiveDef = Math.floor(Game.data.defense * (1 + sectBonus.defPct / 100 + buffBonus.defPct / 100));
@@ -382,8 +428,21 @@ var Battle = {
 
         // 角色攻击
         var baseDmg = effectiveAtk * random(0.8, 1.2);
-        var isCrit = Math.random() < (Game.data.critRate || 0.05);
+        var totalCritRate = (Game.data.critRate || 0.05) + effects.critRate / 100;
+        var isCrit = Math.random() < totalCritRate;
         var playerDmg = Math.floor(isCrit ? baseDmg * 1.5 : baseDmg);
+
+        // 套装额外伤害：青龙6件，20%概率附带50%额外伤害
+        if (effects.extraDmgChance > 0 && Math.random() < effects.extraDmgChance / 100) {
+            var extraDmg = Math.floor(playerDmg * effects.extraDmgPct / 100);
+            playerDmg += extraDmg;
+            this.addLog('套装·青龙！额外造成 ' + extraDmg + ' 点伤害', '#00ff88');
+        }
+
+        // BOSS增伤
+        if (this.isBoss && effects.bossDmg > 0) {
+            playerDmg = Math.floor(playerDmg * (1 + effects.bossDmg / 100));
+        }
 
         if (isCrit) {
             this.addLog('暴击！对' + monsterName + '造成 ' + playerDmg + ' 点伤害', '#ff2222');
@@ -402,8 +461,8 @@ var Battle = {
             return;
         }
 
-        // 吸血效果
-        var totalLifesteal = sectBonus.lifestealPct;
+        // 吸血效果（宗门 + 装备 + 套装）
+        var totalLifesteal = sectBonus.lifestealPct + effects.lifesteal;
         if (totalLifesteal > 0) {
             var lifestealHeal = Math.floor(playerDmg * totalLifesteal / 100);
             if (lifestealHeal > 0) {
@@ -416,10 +475,39 @@ var Battle = {
         var monsterAtk = this.isBoss ? zone.atk * 2 : zone.atk;
         var monsterRaw = monsterAtk * random(0.9, 1.1);
         var monsterDmg = Math.max(1, Math.floor(monsterRaw - effectiveDef * 0.3));
+
+        // 闪避判定
+        if (effects.dodgeRate > 0 && Math.random() < effects.dodgeRate / 100) {
+            monsterDmg = 0;
+            this.addLog(monsterName + '攻击被闪避！', '#3399ff');
+        }
+
+        // 套装伤害减免：玄武6件，概率触发减免
+        if (monsterDmg > 0 && effects.dmgReduceChance > 0 && Math.random() < effects.dmgReduceChance / 100) {
+            monsterDmg = Math.floor(monsterDmg * (1 - effects.dmgReducePct / 100));
+            this.addLog('套装·玄武！减免伤害至 ' + monsterDmg + ' 点', '#3399ff');
+        }
+
         this.addLog(monsterName + '攻击，受到 ' + monsterDmg + ' 点伤害', '#cc6666');
 
         this.playerHP -= monsterDmg;
         this.updatePlayerBar();
+
+        // 反击判定
+        if (monsterDmg > 0 && effects.counterRate > 0 && Math.random() < effects.counterRate / 100) {
+            var counterDmg = Math.floor(playerDmg * 0.5);
+            this.monsterHP -= counterDmg;
+            this.updateMonsterBar();
+            this.addLog('反击！对' + monsterName + '造成 ' + counterDmg + ' 点伤害', '#ff8800');
+
+            // 反击击杀
+            if (this.monsterHP <= 0) {
+                this.monsterHP = 0;
+                this.updateMonsterBar();
+                this.onMonsterKilled(zone, monsterName);
+                return;
+            }
+        }
 
         // 角色死亡
         if (this.playerHP <= 0) {
@@ -445,8 +533,29 @@ var Battle = {
         var expReward = this.isBoss ? zone.exp * 3 : zone.exp;
         var spiritReward = this.isBoss ? zone.spirit * 3 : zone.spirit;
 
+        // 装备/套装经验加成和灵石加成
+        var effects = getEquipAndSetEffects();
+        if (effects.expBonus > 0) {
+            expReward = Math.floor(expReward * (1 + effects.expBonus / 100));
+        }
+        if (effects.spiritBonus > 0) {
+            spiritReward = Math.floor(spiritReward * (1 + effects.spiritBonus / 100));
+        }
+
         Game.addExperience(expReward);
         Game.addSpirit(spiritReward);
+
+        // 套装击杀回复：朱雀6件
+        if (effects.killHealPct > 0) {
+            var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus)
+                ? Sect.getSectBonus() : { hpPct: 0 };
+            var buffBonus = (typeof Sect !== 'undefined' && Sect.getActiveBuffs)
+                ? Sect.getActiveBuffs() : { hpPct: 0 };
+            var maxHp = Math.floor(Game.data.hp * (1 + sectBonus.hpPct / 100 + buffBonus.hpPct / 100));
+            var healAmt = Math.floor(maxHp * effects.killHealPct / 100);
+            this.playerHP = Math.min(this.playerHP + healAmt, maxHp);
+            this.addLog('套装·朱雀！击杀回复 ' + healAmt + ' 点生命', '#2ecc71');
+        }
 
         // 宗门任务进度联动 — 击杀
         if (typeof Sect !== 'undefined') {

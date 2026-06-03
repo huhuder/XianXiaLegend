@@ -4,6 +4,74 @@
    依赖 utils.js 和 components.js 中的全局函数
    ============================================================ */
 
+/**
+ * 汇总装备和套装的修炼速度加成
+ * @returns {number} 修炼速度总值
+ */
+function getEquipCultSpeed() {
+    var total = 0;
+
+    // 遍历已装备的6个槽位
+    if (Game.data && Game.data.equipped) {
+        for (var i = 0; i < 6; i++) {
+            var eq = Game.data.equipped[i];
+            if (eq && eq.effects) {
+                for (var j = 0; j < eq.effects.length; j++) {
+                    if (eq.effects[j].key === 'cultSpeed') {
+                        total += eq.effects[j].value;
+                    }
+                }
+            }
+        }
+    }
+
+    // 套装加成
+    if (typeof Equipment !== 'undefined' && Equipment.getActiveSetBonuses) {
+        var bonuses = Equipment.getActiveSetBonuses();
+        for (var b = 0; b < bonuses.length; b++) {
+            if (bonuses[b].effects.cultSpeed) {
+                total += bonuses[b].effects.cultSpeed;
+            }
+        }
+    }
+
+    return total;
+}
+
+/**
+ * 汇总装备和套装的暴击率
+ * @returns {number} 实际暴击率（百分比整数，如5、15、23）
+ */
+function getTotalCritRate() {
+    var total = 5; // 基础5%
+
+    // 遍历已装备的6个槽位
+    if (Game.data && Game.data.equipped) {
+        for (var i = 0; i < 6; i++) {
+            var eq = Game.data.equipped[i];
+            if (eq && eq.effects) {
+                for (var j = 0; j < eq.effects.length; j++) {
+                    if (eq.effects[j].key === 'critRate') {
+                        total += eq.effects[j].value;
+                    }
+                }
+            }
+        }
+    }
+
+    // 套装加成
+    if (typeof Equipment !== 'undefined' && Equipment.getActiveSetBonuses) {
+        var bonuses = Equipment.getActiveSetBonuses();
+        for (var b = 0; b < bonuses.length; b++) {
+            if (bonuses[b].effects.critRate) {
+                total += bonuses[b].effects.critRate;
+            }
+        }
+    }
+
+    return total;
+}
+
 var Cultivation = {
 
     /* ----------------------------------------------------------
@@ -48,7 +116,7 @@ var Cultivation = {
 
         var mult = getRealmMultiplier(Game.data.realmIndex);
         var baseExp = mult * randInt(1, 3);
-        var expGain = Math.floor(baseExp * (1 + Ascension.getCultivateSpeedBonus()));
+        var expGain = Math.floor(baseExp * (1 + Ascension.getCultivateSpeedBonus() + getEquipCultSpeed() / 100));
         var stoneGain = mult * randInt(1, 2);
 
         Game.data.experience += expGain;
@@ -197,7 +265,7 @@ var Cultivation = {
         Game.dom.statHp.textContent = Game.data.hp.toLocaleString();
         Game.dom.statAtk.textContent = Game.data.attack.toLocaleString();
         Game.dom.statDef.textContent = Game.data.defense.toLocaleString();
-        Game.dom.statCrit.textContent = '5%';
+        Game.dom.statCrit.textContent = getTotalCritRate() + '%';
 
         var maxVal = Math.max(Game.data.hp, Game.data.attack * 3, Game.data.defense * 5, 1);
         Game.dom.hpBar.style.width = Math.min(100, (Game.data.hp / maxVal) * 100) + '%';
