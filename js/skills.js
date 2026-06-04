@@ -148,21 +148,23 @@ var Skills = {
     },
 
     /* ----------------------------------------------------------
-       根据ID查找技能定义
+       根据ID查找技能定义（已应用等级倍率）
        ---------------------------------------------------------- */
     findSkillById: function (skillId) {
-        // 先查通用
-        for (var i = 0; i < this.COMMON_SKILLS.length; i++) {
-            if (this.COMMON_SKILLS[i].id === skillId) return this.COMMON_SKILLS[i];
-        }
-        // 查宗门
-        for (var key in this.SECT_SKILLS) {
-            var pool = this.SECT_SKILLS[key];
-            for (var j = 0; j < pool.length; j++) {
-                if (pool[j].id === skillId) return pool[j];
-            }
-        }
-        return null;
+        var raw = this.findSkillByIdRaw(skillId);
+        if (!raw) return null;
+        var lv = this.getSkillLevel(skillId);
+        if (lv === 1) return raw;
+        var mult = this.getLevelMultiplier(lv);
+        var copy = {};
+        for (var k in raw) { copy[k] = raw[k]; }
+        copy.value = Math.floor(raw.value * mult);
+        copy.level = lv;
+        if (copy.dotValue) copy.dotValue = Math.floor(raw.dotValue * mult);
+        if (copy.lifestealPct) copy.lifestealPct = Math.floor(raw.lifestealPct * mult);
+        if (copy.splash) copy.splash = Math.floor(raw.splash * mult);
+        if (copy.bossBonus) copy.bossBonus = Math.floor(raw.bossBonus * mult);
+        return copy;
     },
 
     /* ----------------------------------------------------------
@@ -374,23 +376,32 @@ var Skills = {
         html += '<div class="skills-list">';
         for (var k = 0; k < skills.length; k++) {
             var sk = skills[k];
+            var skAdjusted = this.findSkillById(sk.id) || sk;
             var isEquipped = equipped.indexOf(sk.id) >= 0;
             var skCd = this.getCooldown(sk.id);
             var cdPct = (1 - skCd / sk.cd) * 100;
-            var typeLabel = this._getTypeLabel(sk.type);
+            var typeLabel = this._getTypeLabel(skAdjusted.type);
+            var lv = this.getSkillLevel(sk.id);
+            var maxLv = this.getMaxLevel();
+            var upgradeCost = lv < maxLv ? this.getUpgradeCost(sk.id) : 0;
             html += '<div class="skill-card' + (isEquipped ? ' equipped' : '') + '" onclick="Skills._toggleDetail(event, \'' + sk.id + '\')">';
             html += '<div class="skill-card-left">';
-            html += '<span class="skill-card-icon">' + sk.icon + '</span>';
+            html += '<span class="skill-card-icon">' + skAdjusted.icon + '</span>';
             html += '<div class="skill-card-info">';
-            html += '<div class="skill-card-name">' + sk.name + '</div>';
-            html += '<div class="skill-card-meta"><span class="skill-type-tag skill-type-' + sk.type + '">' + typeLabel + '</span> CD:' + sk.cd + 'tick</div>';
-            html += '<div class="skill-card-detail" id="skill-detail-' + sk.id + '" style="display:none">' + this._getDetailText(sk) + '</div>';
+            html += '<div class="skill-card-name">' + skAdjusted.name + ' <span class="skill-lv-tag">Lv.' + lv + '</span></div>';
+            html += '<div class="skill-card-meta"><span class="skill-type-tag skill-type-' + skAdjusted.type + '">' + typeLabel + '</span> CD:' + skAdjusted.cd + 'tick</div>';
+            html += '<div class="skill-card-detail" id="skill-detail-' + sk.id + '" style="display:none">' + this._getDetailText(skAdjusted) + '</div>';
             html += '</div>';
             html += '</div>';
             html += '<div class="skill-card-right">';
             if (skCd > 0) {
                 html += '<div class="skill-card-cd-bar" style="width:' + cdPct + '%"></div>';
                 html += '<span class="skill-card-cd-text">CD:' + skCd + '</span>';
+            }
+            if (lv < maxLv) {
+                html += '<button class="skill-upgrade-btn" onclick="event.stopPropagation();Skills.upgradeSkill(\'' + sk.id + '\');Skills.render();">升级 ' + formatNum(upgradeCost) + '灵</button>';
+            } else {
+                html += '<span class="skill-max-tag">MAX</span>';
             }
             if (!isEquipped) {
                 html += '<button class="skill-equip-btn" onclick="event.stopPropagation();Skills.equipSkill(\'' + sk.id + '\',' + (equipped.indexOf(null) >= 0 ? equipped.indexOf(null) : 0) + ');Skills.render();">装备</button>';
@@ -514,3 +525,67 @@ var Skills = {
         }
         return details.join('<br>');
     },
+
+    /* ============================================================
+       技能升级系统
+       ============================================================ */
+
+    /* 获取技能等级 */
+    getSkillLevel: function (skillId) {
+        if (!Game.data.skillLevels) Game.data.skillLevels = {};
+        return Game.data.skillLevels[skillId] || 1;
+    },
+
+    /* 等级倍率：Lv1=1.0, Lv2=1.15, ..., Lv10=2.35（每级+15%） */
+    getLevelMultiplier: function (level) {
+        return 1 + (level - 1) * 0.15;
+    },
+
+    /* 升级消耗（灵石） */
+    getUpgradeCost: function (skillId) {
+        var lv = this.getSkillLevel(skillId);
+        var skill = this.findSkillByIdRaw(skillId);
+        if (!skill) return 999999;
+        return Math.floor((lv * lv) * 50 * (skill.realm !== undefined ? 1 : 1.2));
+    },
+
+    /* 获取最大等级 */
+    getMaxLevel: function () {
+        return 10;
+    },
+
+    /* 执行升级 */
+    upgradeSkill: function (skillId) {
+        var currentLv = this.getSkillLevel(skillId);
+        if (currentLv >= this.getMaxLevel()) {
+            showToast('已达满级！', 1500);
+            return false;
+        }
+        var cost = this.getUpgradeCost(skillId);
+        if ((Game.data.spiritStones || 0) < cost) {
+            showToast('灵石不足（需 ' + formatNum(cost) + '）', 2000);
+            return false;
+        }
+        Game.data.spiritStones -= cost;
+        if (!Game.data.skillLevels) Game.data.skillLevels = {};
+        Game.data.skillLevels[skillId] = currentLv + 1;
+        Game.saveGame();
+        showToast('技能升至 Lv.' + (currentLv + 1) + '！', 2000);
+        return true;
+    },
+
+    /* 查找技能原始定义（不乘等级倍率） */
+    findSkillByIdRaw: function (skillId) {
+        for (var i = 0; i < this.COMMON_SKILLS.length; i++) {
+            if (this.COMMON_SKILLS[i].id === skillId) return this.COMMON_SKILLS[i];
+        }
+        for (var key in this.SECT_SKILLS) {
+            var pool = this.SECT_SKILLS[key];
+            for (var j = 0; j < pool.length; j++) {
+                if (pool[j].id === skillId) return pool[j];
+            }
+        }
+        return null;
+    }
+
+};

@@ -2400,3 +2400,46 @@ body {
     border: 1px solid rgba(255, 215, 0, 0.3);
     border-radius: 4px;
 }
+
+/* 技能等级标签 */
+.skill-lv-tag {
+    font-size: 10px;
+    color: #ffd700;
+    background: rgba(255, 215, 0, 0.12);
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 4px;
+    font-family: var(--font-body);
+}
+
+/* 升级按钮 */
+.skill-upgrade-btn {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 5px;
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    color: #fff;
+    font-size: 10px;
+    font-weight: bold;
+    font-family: var(--font-body);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.skill-upgrade-btn:hover {
+    filter: brightness(1.2);
+    transform: scale(1.05);
+}
+
+/* MAX标签 */
+.skill-max-tag {
+    font-size: 10px;
+    color: #ffd700;
+    font-weight: bold;
+    padding: 4px 8px;
+    background: rgba(255, 215, 0, 0.08);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+}
