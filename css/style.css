@@ -2924,3 +2924,352 @@ body {
     justify-content: center;
     margin-top: 4px;
 }
+
+/* ============================================================
+   灵兽培养系统（第11-3批）— 详情 / 喂食 / 进化
+   ============================================================ */
+
+/* 图鉴卡片已捕捉 → 可点击 */
+.beast-card.captured {
+    cursor: pointer;
+}
+
+/* 返回按钮行 */
+.detail-back-row {
+    margin-bottom: 8px;
+}
+
+.detail-back-btn {
+    background: transparent;
+    border: 1px solid rgba(184, 134, 11, 0.2);
+    color: var(--text-secondary);
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-family: var(--font-title);
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.detail-back-btn:hover {
+    color: var(--gold-main);
+    border-color: var(--gold-border);
+}
+
+/* 详情头部 */
+.detail-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    background: rgba(15, 52, 96, 0.35);
+    border: 1px solid rgba(184, 134, 11, 0.2);
+    border-radius: var(--radius-md);
+}
+
+.detail-icon {
+    font-size: 48px;
+    line-height: 1;
+    min-width: 52px;
+    text-align: center;
+}
+
+.detail-title {
+    flex: 1;
+}
+
+.detail-name {
+    font-size: 20px;
+    font-weight: bold;
+    font-family: var(--font-title);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+}
+
+.detail-tags {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.detail-tag-quality {
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    padding: 2px 10px;
+    border: 1px solid;
+    border-radius: 10px;
+    font-family: var(--font-title);
+}
+
+.detail-tag-star {
+    font-size: 13px;
+    color: var(--gold-highlight);
+    font-weight: bold;
+    font-family: var(--font-title);
+    letter-spacing: 1px;
+}
+
+/* 等级 + 经验条 */
+.detail-level-section {
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    background: rgba(15, 52, 96, 0.25);
+    border: 1px solid rgba(184, 134, 11, 0.12);
+    border-radius: var(--radius-sm);
+}
+
+.detail-level-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.detail-lv {
+    font-size: 14px;
+    color: var(--gold-main);
+    font-weight: bold;
+    font-family: var(--font-title);
+}
+
+.detail-max-tag {
+    font-size: 11px;
+    color: #e74c3c;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.detail-exp-text {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.detail-exp-bar {
+    height: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.detail-exp-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+/* 四维属性 */
+.detail-stats-section {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    background: rgba(15, 52, 96, 0.25);
+    border: 1px solid rgba(184, 134, 11, 0.12);
+    border-radius: var(--radius-sm);
+}
+
+.detail-stats-title {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+    font-family: var(--font-title);
+}
+
+.detail-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.detail-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 6px;
+}
+
+.ds-label {
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.ds-val {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-weight: bold;
+}
+
+.ds-atk { color: var(--atk-color); }
+.ds-hp  { color: var(--hp-color);  }
+.ds-def { color: var(--def-color); }
+.ds-crit { color: var(--gold-highlight); }
+
+/* 喂食区域 */
+.detail-feed-section {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    background: rgba(15, 52, 96, 0.25);
+    border: 1px solid rgba(184, 134, 11, 0.12);
+    border-radius: var(--radius-sm);
+}
+
+.detail-section-title {
+    font-size: 13px;
+    color: var(--gold-main);
+    font-family: var(--font-title);
+    letter-spacing: 3px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.detail-feed-disabled,
+.detail-evolve-disabled {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 8px 0;
+}
+
+.detail-feed-info {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.detail-feed-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.feed-adj-btn {
+    width: 36px;
+    height: 30px;
+    border: 1px solid rgba(184, 134, 11, 0.25);
+    border-radius: 6px;
+    background: rgba(15, 52, 96, 0.4);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.feed-adj-btn:hover {
+    background: rgba(184, 134, 11, 0.2);
+    color: var(--gold-main);
+}
+
+.feed-amount {
+    display: inline-block;
+    min-width: 52px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--gold-highlight);
+    font-family: var(--font-title);
+}
+
+.detail-feed-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 8px;
+}
+
+.beast-btn-feed {
+    background: linear-gradient(135deg, rgba(46, 204, 113, 0.2), rgba(39, 174, 96, 0.1));
+    border-color: #27ae60;
+    color: #2ecc71;
+    flex: 1;
+    max-width: 140px;
+}
+
+.beast-btn-feed:hover {
+    box-shadow: 0 0 14px rgba(46, 204, 113, 0.35);
+}
+
+.beast-btn-feed-max {
+    background: linear-gradient(135deg, rgba(230, 126, 34, 0.2), rgba(211, 84, 0, 0.1));
+    border-color: #e67e22;
+    color: #e67e22;
+    flex: 1;
+    max-width: 140px;
+}
+
+.beast-btn-feed-max:hover {
+    box-shadow: 0 0 14px rgba(230, 126, 34, 0.35);
+}
+
+.detail-feed-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.6;
+}
+
+/* 进化区域 */
+.detail-evolve-section {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    background: rgba(15, 52, 96, 0.25);
+    border: 1px solid rgba(184, 134, 11, 0.12);
+    border-radius: var(--radius-sm);
+}
+
+.detail-evolve-info {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    line-height: 1.8;
+}
+
+.detail-evolve-info div {
+    margin-bottom: 2px;
+}
+
+.beast-btn-evolve {
+    background: linear-gradient(135deg, rgba(192, 132, 252, 0.2), rgba(184, 134, 11, 0.15));
+    border-color: #c084fc;
+    color: #c084fc;
+    width: 100%;
+    font-size: 15px;
+    padding: 12px;
+}
+
+.beast-btn-evolve:hover:not(.disabled) {
+    box-shadow: 0 0 20px rgba(192, 132, 252, 0.45);
+    transform: translateY(-1px);
+}
+
+.beast-btn-evolve.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* 出战按钮（占位） */
+.detail-battle-section {
+    margin-bottom: 14px;
+    text-align: center;
+}
+
+.beast-btn-battle {
+    background: rgba(160, 144, 128, 0.1);
+    border-color: var(--text-muted);
+    color: var(--text-muted);
+    width: 100%;
+    max-width: 240px;
+}
+
+.beast-btn-battle.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}

@@ -92,7 +92,8 @@ var Beast = {
             var qColor = this.QUALITY_COLORS[beast.quality];
             var qName = this.QUALITY_NAMES[beast.quality];
 
-            html += '<div class="beast-card' + (captured ? ' captured' : '') + '" style="border-color:' + qColor + ';">';
+            html += '<div class="beast-card' + (captured ? ' captured' : '') + '" style="border-color:' + qColor + ';"' +
+                (captured ? ' data-beast-id="' + captured.id + '"' : '') + '>';
 
             // 品质角标
             html += '<div class="beast-card-quality" style="color:' + qColor + ';">' + qName + '</div>';
@@ -127,6 +128,16 @@ var Beast = {
 
         container.innerHTML = html;
 
+        // 已捕捉卡片点击 → 详情
+        var capturedCards = container.querySelectorAll('.beast-card.captured');
+        for (var c = 0; c < capturedCards.length; c++) {
+            (function (card) {
+                card.addEventListener('click', function (e) {
+                    self.renderBeastDetail(card.getAttribute('data-beast-id'));
+                });
+            })(capturedCards[c]);
+        }
+
         // 前往捕捉按钮事件
         var goCaptureBtn = document.getElementById('btn-go-capture');
         if (goCaptureBtn) {
@@ -149,11 +160,67 @@ var Beast = {
        捕捉系统（第11-2批）
        ========================================================= */
 
-    /** 内部模式标记：'bestiary' | 'capture' */
+    /** 内部模式标记：'bestiary' | 'capture' | 'detail' */
     _mode: 'bestiary',
 
     /** 当前捕捉槽位 */
     captureSlots: [],
+
+    /** 当前查看详情的灵兽ID */
+    _detailBeastId: null,
+
+    /** 喂食数量 */
+    _feedAmount: 1,
+
+    /* =========================================================
+       培养系统（第11-3批）— 辅助计算函数
+       ========================================================= */
+
+    /** 获取灵兽升级所需经验 */
+    getExpRequired: function (beast) {
+        var qualityMult = [1, 2, 4, 8][beast.quality];
+        return beast.level * 100 * qualityMult;
+    },
+
+    /** 获取当前星级最大等级 */
+    getMaxLevel: function (beast) {
+        return beast.star * 20;
+    },
+
+    /** 获取品质最大星级 */
+    getMaxStar: function (quality) {
+        return [2, 3, 4, 5][quality];
+    },
+
+    /** 查找灵兽（by id） */
+    _findBeast: function (beastId) {
+        var list = Game.data.capturedBeasts;
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === beastId) return list[i];
+        }
+        return null;
+    },
+
+    /** 获取基础属性（兼容旧档） */
+    getBaseStats: function (beast) {
+        if (beast.baseStats) return beast.baseStats;
+        return {
+            atk: beast.stats.atk,
+            hp: beast.stats.hp,
+            def: beast.stats.def,
+            critRate: beast.stats.critRate
+        };
+    },
+
+    /** 根据等级重算属性：current = base * (1 + 0.1 * (level - 1)) */
+    _recalcStats: function (beast) {
+        var base = this.getBaseStats(beast);
+        var mult = 1 + 0.1 * (beast.level - 1);
+        beast.stats.atk = Math.floor(base.atk * mult);
+        beast.stats.hp = Math.floor(base.hp * mult);
+        beast.stats.def = Math.floor(base.def * mult);
+        beast.stats.critRate = Math.floor(base.critRate * mult);
+    },
 
     /* ----------------------------------------------------------
        根据境界获取可捕捉的最高品质
@@ -308,7 +375,8 @@ var Beast = {
             level: 1,
             exp: 0,
             star: 1,
-            stats: stats
+            stats: deepClone(stats),
+            baseStats: deepClone(stats)
         };
 
         Game.data.capturedBeasts.push(captured);
@@ -431,6 +499,352 @@ var Beast = {
                 self.renderBestiary();
             });
         }
+    },
+
+    /* =========================================================
+       培养系统（第11-3批）— 详情 / 喂食 / 进化
+       ========================================================= */
+
+    /** 渲染灵兽详情面板 */
+    renderBeastDetail: function (beastId) {
+        var container = document.getElementById('beast-content');
+        if (!container) return;
+
+        var beast = this._findBeast(beastId);
+        if (!beast) { this.renderBestiary(); return; }
+
+        this._mode = 'detail';
+        this._detailBeastId = beastId;
+        this._feedAmount = 1;
+
+        var self = this;
+        var qColor = this.QUALITY_COLORS[beast.quality];
+        var qName = this.QUALITY_NAMES[beast.quality];
+        var maxLv = this.getMaxLevel(beast);
+        var expReq = this.getExpRequired(beast);
+        var isMaxLv = beast.level >= maxLv;
+        var maxStar = this.getMaxStar(beast.quality);
+        var isMaxStar = beast.star >= maxStar;
+
+        // 查找图鉴池中的图标
+        var icon = '';
+        for (var j = 0; j < this.BEAST_POOL.length; j++) {
+            if (this.BEAST_POOL[j].name === beast.name) {
+                icon = this.BEAST_POOL[j].icon;
+                break;
+            }
+        }
+
+        var html = '';
+
+        // 返回按钮行
+        html += '<div class="detail-back-row">' +
+            '<button class="detail-back-btn" id="btn-detail-back">← 返回图鉴</button>' +
+            '</div>';
+
+        // 头部：图标 + 名称 + 品质星
+        html += '<div class="detail-header">' +
+            '<div class="detail-icon">' + icon + '</div>' +
+            '<div class="detail-title">' +
+            '<div class="detail-name" style="color:' + qColor + ';">' + beast.name + '</div>' +
+            '<div class="detail-tags">' +
+            '<span class="detail-tag-quality" style="color:' + qColor + ';border-color:' + qColor + ';">' + qName + '</span>' +
+            '<span class="detail-tag-star">★ x' + beast.star + '</span>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+
+        // 等级和经验条
+        var expPct = isMaxLv ? 100 : Math.min(100, Math.floor(beast.exp / expReq * 100));
+        html += '<div class="detail-level-section">' +
+            '<div class="detail-level-row">' +
+            '<span class="detail-lv">Lv.' + beast.level + '</span>' +
+            (isMaxLv ? '<span class="detail-max-tag">MAX</span>' :
+                '<span class="detail-exp-text">' + beast.exp + ' / ' + expReq + '</span>') +
+            '</div>' +
+            '<div class="detail-exp-bar">' +
+            '<div class="detail-exp-fill" style="width:' + expPct + '%;background:' + qColor + ';"></div>' +
+            '</div>' +
+            '</div>';
+
+        // 四维属性
+        html += '<div class="detail-stats-section">' +
+            '<div class="detail-stats-title">四 维 属 性</div>' +
+            '<div class="detail-stats-grid">' +
+            '<div class="detail-stat"><span class="ds-label ds-atk">攻击</span><span class="ds-val">' + beast.stats.atk + '</span></div>' +
+            '<div class="detail-stat"><span class="ds-label ds-hp">生命</span><span class="ds-val">' + beast.stats.hp + '</span></div>' +
+            '<div class="detail-stat"><span class="ds-label ds-def">防御</span><span class="ds-val">' + beast.stats.def + '</span></div>' +
+            '<div class="detail-stat"><span class="ds-label ds-crit">暴击率</span><span class="ds-val">' + beast.stats.critRate + '%</span></div>' +
+            '</div>' +
+            '</div>';
+
+        // 喂食区域
+        html += '<div class="detail-feed-section">' +
+            '<div class="detail-section-title">喂 食 升 级</div>';
+
+        if (isMaxLv) {
+            html += '<div class="detail-feed-disabled">已达当前星级上限，请进化后再升级</div>';
+        } else {
+            var foodNeededOne = Math.max(1, Math.ceil((expReq - beast.exp) / 100));
+            html += '<div class="detail-feed-info">当前口粮：<span class="br-food">' + formatNumber(Game.data.beastFood) + '</span> — 本级还需 ' + foodNeededOne + ' 份</div>' +
+                '<div class="detail-feed-controls">' +
+                '<button class="feed-adj-btn" id="btn-feed-minus10">-10</button>' +
+                '<button class="feed-adj-btn" id="btn-feed-minus">-1</button>' +
+                '<span class="feed-amount" id="feed-amount-display">' + this._feedAmount + '</span>' +
+                '<button class="feed-adj-btn" id="btn-feed-plus">+1</button>' +
+                '<button class="feed-adj-btn" id="btn-feed-plus10">+10</button>' +
+                '</div>' +
+                '<div class="detail-feed-actions">' +
+                '<button class="beast-btn beast-btn-feed" id="btn-feed-go">喂 食</button>' +
+                '<button class="beast-btn beast-btn-feed-max" id="btn-feed-max">一键满级</button>' +
+                '</div>';
+        }
+
+        html += '<div class="detail-feed-hint">口粮可通过宗门贡献兑换、挂机战斗掉落获得</div>' +
+            '</div>';
+
+        // 进化区域
+        html += '<div class="detail-evolve-section">' +
+            '<div class="detail-section-title">进 化 升 星</div>';
+
+        if (isMaxStar) {
+            html += '<div class="detail-evolve-disabled">已达品质上限（' + qName + '最高' + maxStar + '星）</div>';
+        } else if (!isMaxLv) {
+            html += '<div class="detail-evolve-disabled">需达到 Lv.' + maxLv + ' 方可进化</div>';
+        } else {
+            var stoneCost = beast.star * 5000 * (beast.quality + 1);
+            var canAfford = Game.data.spiritStones >= stoneCost;
+            // 找同品质牺牲材料（排除自身）
+            var sacrificeCandidates = [];
+            for (var k = 0; k < Game.data.capturedBeasts.length; k++) {
+                var cb = Game.data.capturedBeasts[k];
+                if (cb.id !== beast.id && cb.quality === beast.quality) {
+                    sacrificeCandidates.push(cb);
+                }
+            }
+            html += '<div class="detail-evolve-info">' +
+                '<div>消耗：<span class="br-stone">' + formatNumber(stoneCost) + '灵石</span></div>' +
+                '<div>材料：同品质灵兽 1 只' + (sacrificeCandidates.length > 0 ? '（可选 ' + sacrificeCandidates.length + ' 只）' : '（无可用材料）') + '</div>' +
+                '<div>结果：星级 +1 → ★x' + (beast.star + 1) + '，属性基础 ×1.5，等级重置为 1</div>' +
+                '</div>';
+
+            if (!canAfford || sacrificeCandidates.length === 0) {
+                var reason = !canAfford ? '灵石不足' : '无同品质灵兽可作材料';
+                html += '<button class="beast-btn beast-btn-evolve disabled" disabled>' + reason + '</button>';
+            } else {
+                html += '<button class="beast-btn beast-btn-evolve" id="btn-evolve-go">进 化 升 星</button>';
+            }
+        }
+
+        html += '</div>';
+
+        // 出战按钮（占位）
+        html += '<div class="detail-battle-section">' +
+            '<button class="beast-btn beast-btn-battle disabled" disabled>出 战（即将开放）</button>' +
+            '</div>';
+
+        container.innerHTML = html;
+
+        // === 事件绑定 ===
+
+        // 返回按钮
+        var backBtn = document.getElementById('btn-detail-back');
+        if (backBtn) {
+            backBtn.addEventListener('click', function () {
+                self._mode = 'bestiary';
+                self.renderBestiary();
+            });
+        }
+
+        if (!isMaxLv) {
+            // 喂食数量调节
+            var btnMinus10 = document.getElementById('btn-feed-minus10');
+            var btnMinus = document.getElementById('btn-feed-minus');
+            var btnPlus = document.getElementById('btn-feed-plus');
+            var btnPlus10 = document.getElementById('btn-feed-plus10');
+            var display = document.getElementById('feed-amount-display');
+
+            var updateDisplay = function () {
+                if (display) display.textContent = self._feedAmount;
+            };
+
+            if (btnMinus10) btnMinus10.addEventListener('click', function () { self._feedAmount = Math.max(1, self._feedAmount - 10); updateDisplay(); });
+            if (btnMinus)   btnMinus.addEventListener('click',   function () { self._feedAmount = Math.max(1, self._feedAmount - 1);  updateDisplay(); });
+            if (btnPlus)    btnPlus.addEventListener('click',    function () { self._feedAmount = Math.min(9999, self._feedAmount + 1);  updateDisplay(); });
+            if (btnPlus10)  btnPlus10.addEventListener('click',  function () { self._feedAmount = Math.min(9999, self._feedAmount + 10); updateDisplay(); });
+
+            // 喂食按钮
+            var feedBtn = document.getElementById('btn-feed-go');
+            if (feedBtn) feedBtn.addEventListener('click', function () { self.feedBeast(self._feedAmount); });
+
+            // 一键满级
+            var maxBtn = document.getElementById('btn-feed-max');
+            if (maxBtn) maxBtn.addEventListener('click', function () { self.feedToMax(); });
+        }
+
+        // 进化按钮
+        var evolveBtn = document.getElementById('btn-evolve-go');
+        if (evolveBtn) {
+            evolveBtn.addEventListener('click', function () {
+                self.evolveBeast();
+            });
+        }
+    },
+
+    /** 计算从当前等级到 targetLevel 所需总经验 */
+    _calcExpToLevel: function (beast, targetLevel) {
+        var total = 0;
+        var qualityMult = [1, 2, 4, 8][beast.quality];
+        for (var lv = beast.level; lv < targetLevel; lv++) {
+            total += lv * 100 * qualityMult;
+        }
+        total -= beast.exp; // 减去已有经验
+        return Math.max(0, total);
+    },
+
+    /** 喂食灵兽 */
+    feedBeast: function (amount) {
+        var beast = this._findBeast(this._detailBeastId);
+        if (!beast) return;
+
+        var maxLv = this.getMaxLevel(beast);
+        if (beast.level >= maxLv) {
+            showToast('已达当前星级上限');
+            return;
+        }
+
+        var totalFood = amount;
+        if (Game.data.beastFood < totalFood) {
+            showToast('口粮不足，当前仅有' + Game.data.beastFood + '份');
+            return;
+        }
+        if (totalFood <= 0) {
+            showToast('请输入有效数量');
+            return;
+        }
+
+        var expGain = totalFood * 100;
+        Game.data.beastFood -= totalFood;
+
+        var levelUps = 0;
+        while (expGain > 0 && beast.level < maxLv) {
+            var need = this.getExpRequired(beast) - beast.exp;
+            if (expGain >= need) {
+                expGain -= need;
+                beast.exp = 0;
+                beast.level++;
+                levelUps++;
+            } else {
+                beast.exp += expGain;
+                expGain = 0;
+            }
+        }
+
+        // 重算属性
+        this._recalcStats(beast);
+
+        Game.saveGame();
+        this.renderBeastDetail(this._detailBeastId);
+
+        if (levelUps > 0) {
+            showToast(beast.name + ' 升至 Lv.' + beast.level + '！');
+        }
+    },
+
+    /** 一键喂到满级 */
+    feedToMax: function () {
+        var beast = this._findBeast(this._detailBeastId);
+        if (!beast) return;
+
+        var maxLv = this.getMaxLevel(beast);
+        if (beast.level >= maxLv) {
+            showToast('已达当前星级上限');
+            return;
+        }
+
+        var totalExpNeeded = this._calcExpToLevel(beast, maxLv);
+        var foodNeeded = Math.ceil(totalExpNeeded / 100);
+
+        if (foodNeeded <= 0) {
+            showToast('已满级');
+            return;
+        }
+
+        if (Game.data.beastFood < foodNeeded) {
+            showToast('口粮不足，需要' + foodNeeded + '份，当前仅有' + Game.data.beastFood + '份');
+            return;
+        }
+
+        this.feedBeast(foodNeeded);
+    },
+
+    /** 进化升星 */
+    evolveBeast: function () {
+        var beast = this._findBeast(this._detailBeastId);
+        if (!beast) return;
+
+        var maxLv = this.getMaxLevel(beast);
+        if (beast.level < maxLv) {
+            showToast('灵兽未满级，无法进化');
+            return;
+        }
+
+        var maxStar = this.getMaxStar(beast.quality);
+        if (beast.star >= maxStar) {
+            showToast('已达品质最高星级');
+            return;
+        }
+
+        var stoneCost = beast.star * 5000 * (beast.quality + 1);
+        if (Game.data.spiritStones < stoneCost) {
+            showToast('灵石不足，需要' + formatNumber(stoneCost) + '灵石');
+            return;
+        }
+
+        // 找同品质牺牲材料
+        var sacrificeIdx = -1;
+        for (var i = 0; i < Game.data.capturedBeasts.length; i++) {
+            if (Game.data.capturedBeasts[i].id !== beast.id &&
+                Game.data.capturedBeasts[i].quality === beast.quality) {
+                sacrificeIdx = i;
+                break;
+            }
+        }
+        if (sacrificeIdx === -1) {
+            showToast('需要一只同品质灵兽作为进化材料');
+            return;
+        }
+
+        var sacrifice = Game.data.capturedBeasts[sacrificeIdx];
+
+        // 扣除灵石
+        Game.data.spiritStones -= stoneCost;
+
+        // 移除牺牲材料
+        Game.data.capturedBeasts.splice(sacrificeIdx, 1);
+
+        // 升星
+        beast.star++;
+
+        // 基础属性 ×1.5
+        var base = this.getBaseStats(beast);
+        beast.baseStats = {
+            atk: Math.floor(base.atk * 1.5),
+            hp: Math.floor(base.hp * 1.5),
+            def: Math.floor(base.def * 1.5),
+            critRate: Math.floor(base.critRate * 1.5)
+        };
+
+        // 重置等级
+        beast.level = 1;
+        beast.exp = 0;
+
+        // 重算属性
+        this._recalcStats(beast);
+
+        Game.saveGame();
+        this.renderBeastDetail(this._detailBeastId);
+        showToast(beast.name + ' 进化为 ★x' + beast.star + '！');
     },
 
 };
