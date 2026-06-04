@@ -415,6 +415,11 @@ var Ascension = {
         Game.data.ascensionCount = (Game.data.ascensionCount || 0) + 1;
         Game.data.ascensionFailed = false;
 
+        // 奖励天赋点
+        if (typeof Talents !== 'undefined') {
+            Talents.addPoints(3);
+        }
+
         // 属性乘以 1.2
         var mult = 1.2;
         Game.data.hp = Math.floor(Game.data.hp * mult);
@@ -485,6 +490,7 @@ var Ascension = {
             '飞升次数：' + Game.data.ascensionCount + ' 次',
             '属性加成：×' + this.getAscensionMultiplier().toFixed(1),
             '修炼速度：+' + (this.getCultivateSpeedBonus() * 100) + '%',
+            '天赋点：+3（当前 ' + (Game.data.talentPoints || 0) + ' 点）',
             '生命：' + formatNumber(Game.data.hp),
             '攻击：' + formatNumber(Game.data.attack),
             '防御：' + formatNumber(Game.data.defense)

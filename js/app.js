@@ -42,6 +42,12 @@ var Game = {
         bossExtraChances: 0,      // 已购买的额外挑战次数（每日重置）
         ascensionCount: 0,        // 飞升次数
         ascensionFailed: false,   // 上次天劫是否失败
+        talentPoints: 0,          // 可用天赋点
+        talents: {                // 天赋等级 sword/body/qi 各0~10
+            sword: 0,
+            body: 0,
+            qi: 0
+        },
     },
 
     /** 运行时游戏数据（初始化为默认值） */
@@ -204,6 +210,11 @@ var Game = {
         if (tabName === 'character' && !this._equipInit) {
             Equipment.init();
             this._equipInit = true;
+        }
+
+        // 角色Tab：渲染天赋子页面
+        if (tabName === 'character' && typeof Talents !== 'undefined') {
+            Talents.render();
         }
 
         // 宗门Tab：懒加载
@@ -410,6 +421,17 @@ var Game = {
             }
             if (this.data.ascensionFailed === undefined || this.data.ascensionFailed === null) {
                 this.data.ascensionFailed = false;
+            }
+            // 天赋系统兼容（第7批新增）
+            if (this.data.talentPoints === undefined || this.data.talentPoints === null) {
+                this.data.talentPoints = 0;
+            }
+            if (!this.data.talents || typeof this.data.talents !== 'object') {
+                this.data.talents = { sword: 0, body: 0, qi: 0 };
+            } else {
+                if (this.data.talents.sword === undefined) this.data.talents.sword = 0;
+                if (this.data.talents.body === undefined) this.data.talents.body = 0;
+                if (this.data.talents.qi === undefined) this.data.talents.qi = 0;
             }
 
             return true;

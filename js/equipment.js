@@ -254,19 +254,22 @@ var Equipment = {
        怪物死亡掉落判定（从高品质到低品质依次判定）
        @param {number} mapIndex - 当前地图索引
        ---------------------------------------------------------- */
-    rollDrop: function (mapIndex) {
+    rollDrop: function (mapIndex, isBoss) {
+        var dropRate = isBoss ? 0.6 : 0.3;
+        // 先判定是否触发掉落（普通怪 30%，BOSS 60%）
+        if (Math.random() > dropRate) return;
+
         var tier = this.EQUIP_TIERS[mapIndex];
         var qRates = tier.qRates;
-        // qRates 每个值乘以 0.3 作为权重（保持总掉落率 30%）
         var totalWeight = 0;
         for (var i = 0; i < qRates.length; i++) {
-            totalWeight += qRates[i] * 0.3;
+            totalWeight += qRates[i];
         }
         var roll = Math.random() * totalWeight;
         var cumulative = 0;
         var selectedQuality = -1;
         for (var i = qRates.length - 1; i >= 0; i--) {
-            cumulative += qRates[i] * 0.3;
+            cumulative += qRates[i];
             if (roll < cumulative) {
                 selectedQuality = i;
                 break;

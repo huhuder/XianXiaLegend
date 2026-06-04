@@ -52,6 +52,7 @@
             <!-- 子Tab切换按钮组 -->
             <div class="sub-tabs">
                 <button class="sub-tab-btn active" data-sub="stats">属性</button>
+                <button class="sub-tab-btn" data-sub="talents">天赋</button>
                 <button class="sub-tab-btn" data-sub="inventory">背包</button>
                 <button class="sub-tab-btn" data-sub="equipped">装备</button>
             </div>
@@ -94,6 +95,11 @@
                         <span class="stat-val" id="stat-crit">5%</span>
                     </div>
                 </div>
+            </div>
+
+            <!-- 子页面：天赋 -->
+            <div id="sub-talents" class="sub-page">
+                <div id="talents-content"></div>
             </div>
 
             <!-- 子页面：背包 -->
@@ -190,6 +196,7 @@
 <script src="js/cultivation.js"></script>
 <script src="js/battle.js"></script>
 <script src="js/equipment.js"></script>
+<script src="js/talents.js"></script>
 <script src="js/sect.js"></script>
 <script src="js/worldBoss.js"></script>
 <script src="js/ascension.js"></script>

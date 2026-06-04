@@ -157,12 +157,12 @@ var Battle = {
         for (var i = 0; i < this.ZONES.length; i++) {
             (function (idx) {
                 var zone = self.ZONES[idx];
-                var unlocked = realmIndex >= zone.realmRequired;
+                var unlocked = realmIndex >= zone.unlockRealm;
                 var isActive = self.zoneIndex === idx;
 
                 var btn = document.createElement('button');
                 btn.textContent = zone.name.substring(0, 4);
-                btn.title = zone.name + '（需' + REALMS[zone.realmRequired] + '）';
+                btn.title = zone.name + '（需' + REALMS[zone.unlockRealm] + '）';
                 btn.style.cssText = 'padding:4px 10px;border-radius:6px;font-size:12px;' +
                     'font-family:inherit;cursor:' + (unlocked ? 'pointer' : 'not-allowed') + ';' +
                     'border:1px solid ' + (isActive ? '#d4a574' : '#3a3a4a') + ';' +
@@ -240,7 +240,7 @@ var Battle = {
 
         var bossName = '';
         if (this.isBoss) {
-            bossName = this.BOSS_NAMES[randInt(0, this.BOSS_NAMES.length - 1)] + zone.monsterName + '王';
+            bossName = this.BOSS_NAMES[randInt(0, this.BOSS_NAMES.length - 1)] + zone.monster + '王';
             this.monsterHP = zone.hp * 3;
             this.monsterMaxHP = zone.hp * 3;
         } else {
@@ -258,7 +258,7 @@ var Battle = {
         if (this.isBoss) {
             this.addLog('⚠ BOSS「' + bossName + '」出现了！', '#ff4444');
         } else {
-            this.addLog('遭遇 ' + zone.monsterName + '，准备战斗！', '#ffd700');
+            this.addLog('遭遇 ' + zone.monster + '，准备战斗！', '#ffd700');
         }
 
         // 启动战斗定时器
@@ -281,7 +281,7 @@ var Battle = {
             nameEl.textContent = 'BOSS · ' + bossName;
         } else {
             nameEl.style.color = '#e74c3c';
-            nameEl.textContent = zone.monsterName;
+            nameEl.textContent = zone.monster;
         }
         container.appendChild(nameEl);
 
@@ -411,8 +411,8 @@ var Battle = {
 
         var zone = this.ZONES[this.zoneIndex];
         var monsterName = this.isBoss ?
-            (this.BOSS_NAMES[randInt(0, this.BOSS_NAMES.length - 1)] + zone.monsterName + '王') :
-            zone.monsterName;
+            (this.BOSS_NAMES[randInt(0, this.BOSS_NAMES.length - 1)] + zone.monster + '王') :
+            zone.monster;
 
         // 读取宗门功法加成
         var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus)
@@ -425,16 +425,21 @@ var Battle = {
         // 读取装备和套装效果
         var effects = getEquipAndSetEffects();
 
-        // 角色攻击（含宗门加成）
-        var effectiveAtk = Math.floor(Game.data.attack * (1 + sectBonus.atkPct / 100 + buffBonus.atkPct / 100));
-        var effectiveDef = Math.floor(Game.data.defense * (1 + sectBonus.defPct / 100 + buffBonus.defPct / 100));
-        var effectiveHp = Math.floor(Game.data.hp * (1 + sectBonus.hpPct / 100 + buffBonus.hpPct / 100));
+        // 读取天赋效果
+        var talentEff = (typeof Talents !== 'undefined' && Talents.getEffects)
+            ? Talents.getEffects() : { atkPct: 0, hpPct: 0, defPct: 0, critRate: 0, critDmg: 0, dmgReduce: 0, lifestealOnCrit: 0, regenPerTick: 0 };
+
+        // 角色攻击（含宗门+天赋加成）
+        var effectiveAtk = Math.floor(Game.data.attack * (1 + sectBonus.atkPct / 100 + buffBonus.atkPct / 100 + talentEff.atkPct / 100));
+        var effectiveDef = Math.floor(Game.data.defense * (1 + sectBonus.defPct / 100 + buffBonus.defPct / 100 + talentEff.defPct / 100));
+        var effectiveHp = Math.floor(Game.data.hp * (1 + sectBonus.hpPct / 100 + buffBonus.hpPct / 100 + talentEff.hpPct / 100));
 
         // 角色攻击
         var baseDmg = effectiveAtk * random(0.8, 1.2);
-        var totalCritRate = (Game.data.critRate || 0.05) + effects.critRate / 100;
+        var totalCritRate = (Game.data.critRate || 0.05) + effects.critRate / 100 + talentEff.critRate / 100;
+        var critMultiplier = 1.5 + talentEff.critDmg / 100;
         var isCrit = Math.random() < totalCritRate;
-        var playerDmg = Math.floor(isCrit ? baseDmg * 1.5 : baseDmg);
+        var playerDmg = Math.floor(isCrit ? baseDmg * critMultiplier : baseDmg);
 
         // 套装额外伤害：青龙6件，20%概率附带50%额外伤害
         if (effects.extraDmgChance > 0 && Math.random() < effects.extraDmgChance / 100) {
@@ -475,10 +480,24 @@ var Battle = {
             }
         }
 
+        // 天赋暴击吸血（剑道10层）
+        if (isCrit && talentEff.lifestealOnCrit > 0) {
+            var critHeal = Math.floor(effectiveHp * talentEff.lifestealOnCrit / 100);
+            if (critHeal > 0) {
+                this.playerHP = Math.min(this.playerHP + critHeal, effectiveHp);
+                this.addLog('剑域·暴击回血 +' + critHeal, '#ff8888');
+            }
+        }
+
         // 怪物攻击
         var monsterAtk = this.isBoss ? zone.atk * 2 : zone.atk;
         var monsterRaw = monsterAtk * random(0.9, 1.1);
         var monsterDmg = Math.max(1, Math.floor(monsterRaw - effectiveDef * 0.3));
+
+        // 天赋伤害减免
+        if (talentEff.dmgReduce > 0) {
+            monsterDmg = Math.max(1, Math.floor(monsterDmg * (1 - talentEff.dmgReduce / 100)));
+        }
 
         // 闪避判定
         if (effects.dodgeRate > 0 && Math.random() < effects.dodgeRate / 100) {
@@ -510,6 +529,15 @@ var Battle = {
                 this.updateMonsterBar();
                 this.onMonsterKilled(zone, monsterName);
                 return;
+            }
+        }
+
+        // 天赋回合回血（体道10层）
+        if (talentEff.regenPerTick > 0 && this.playerHP > 0) {
+            var regenAmount = Math.floor(effectiveHp * talentEff.regenPerTick / 100);
+            if (regenAmount > 0) {
+                this.playerHP = Math.min(this.playerHP + regenAmount, effectiveHp);
+                this.addLog('真身·回合回血 +' + regenAmount, '#2ecc71');
             }
         }
 
@@ -570,7 +598,7 @@ var Battle = {
         this.addLog(killMsg + ' 经验+' + formatNumber(expReward) + ' 灵石+' + formatNumber(spiritReward), '#ffd700');
 
         // 装备掉落
-        Equipment.rollDrop(this.zoneIndex);
+        Equipment.rollDrop(this.zoneIndex, this.isBoss);
 
         // 1.5秒后刷下一只
         var self = this;

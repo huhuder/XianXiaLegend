@@ -116,8 +116,18 @@ var Cultivation = {
 
         var mult = getRealmMultiplier(Game.data.realmIndex);
         var baseExp = mult * randInt(1, 3);
-        var expGain = Math.floor(baseExp * (1 + Ascension.getCultivateSpeedBonus() + getEquipCultSpeed() / 100));
+
+        // 天赋修炼速度和经验加成
+        var talentCultSpeed = (typeof Talents !== 'undefined' && Talents.getCultSpeedBonus) ? Talents.getCultSpeedBonus() : 0;
+        var talentExpBonus = (typeof Talents !== 'undefined' && Talents.getExpBonusRate) ? Talents.getExpBonusRate() : 0;
+
+        var totalCultSpeed = 1 + Ascension.getCultivateSpeedBonus() + getEquipCultSpeed() / 100 + talentCultSpeed / 100;
+        var expGain = Math.floor(baseExp * totalCultSpeed * (1 + talentExpBonus));
         var stoneGain = mult * randInt(1, 2);
+
+        // 天赋灵石加成
+        var talentSpiritBonus = (typeof Talents !== 'undefined' && Talents.getSpiritBonusRate) ? Talents.getSpiritBonusRate() : 0;
+        stoneGain = Math.floor(stoneGain * (1 + talentSpiritBonus));
 
         Game.data.experience += expGain;
         Game.data.spiritStones += stoneGain;
