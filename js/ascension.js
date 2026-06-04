@@ -121,7 +121,8 @@ var Ascension = {
         container.innerHTML = '';
         container.style.cssText = 'position:relative;min-height:400px;';
 
-        // 全屏天劫背景
+        // 全屏天劫背景（先清除旧遮罩）
+        this.removeTribulationOverlay();
         var overlay = document.createElement('div');
         overlay.id = 'tribulation-overlay';
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
@@ -625,8 +626,10 @@ var Ascension = {
        移除天劫背景
        ---------------------------------------------------------- */
     removeTribulationOverlay: function () {
-        var overlay = document.getElementById('tribulation-overlay');
-        if (overlay) overlay.remove();
+        var overlays = document.querySelectorAll('#tribulation-overlay');
+        for (var i = 0; i < overlays.length; i++) {
+            overlays[i].remove();
+        }
     },
 
     /* ----------------------------------------------------------
@@ -836,17 +839,44 @@ var Ascension = {
             }
         } else {
             // 未飞升状态
-            html += '<div style="text-align:center;padding:40px 20px;">' +
+            html += '<div style="text-align:center;padding:20px 20px;">' +
                 '<div style="font-size:64px;margin-bottom:16px;opacity:0.3;">✨</div>' +
                 '<div style="font-size:18px;color:var(--text-muted);font-family:var(--font-title);' +
                 'letter-spacing:3px;margin-bottom:12px;">飞升未至</div>' +
-                '<div style="font-size:13px;color:var(--text-secondary);line-height:1.8;">' +
+                '<div style="font-size:13px;color:var(--text-secondary);line-height:1.8;margin-bottom:20px;">' +
                 '修炼至渡劫巅峰，即可引动天劫飞升<br>' +
                 '每次飞升：全属性 ×1.2，修炼速度 +50%<br><br>' +
                 '当前境界：' + getRealmDisplayName(Game.data.realmIndex, Game.data.layer) + '<br>' +
                 '最高境界：' + REALMS[REALMS.length - 1] + '·10层' +
                 '</div>' +
                 '</div>';
+
+            // 首次飞升也显示渡劫按钮
+            if (this.canAscend()) {
+                html += '<button id="ascend-trib-btn" ' +
+                    'style="display:block;width:100%;padding:14px 0;' +
+                    'border:2px solid #ffd700;border-radius:12px;' +
+                    'background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,180,0,0.08));' +
+                    'color:#ffd700;font-size:18px;font-weight:bold;font-family:var(--font-title);' +
+                    'letter-spacing:4px;cursor:pointer;transition:all 0.3s;' +
+                    'box-shadow:0 0 20px rgba(255,215,0,0.3);">渡 劫 飞 升</button>';
+                if (Game.data.ascensionFailed) {
+                    html += '<div style="text-align:center;font-size:12px;color:#e74c3c;margin-top:8px;">' +
+                        '上次渡劫失败，请再次挑战！</div>';
+                }
+            } else {
+                html += '<div style="text-align:center;padding:16px;' +
+                    'background:rgba(15,52,96,0.3);border:1px solid rgba(184,134,11,0.15);' +
+                    'border-radius:10px;font-size:13px;color:var(--text-secondary);line-height:1.8;">';
+                if (!Cultivation.isAscensionThreshold()) {
+                    html += '需修炼至渡劫·十层方可渡劫飞升';
+                } else if (!Cultivation.isExpFull()) {
+                    html += '境界已达巅峰，但经验尚未圆满';
+                } else if (Game.data.spiritStones < 100000) {
+                    html += '灵石不足（需 100,000），无法开启天劫';
+                }
+                html += '</div>';
+            }
         }
 
         container.innerHTML = html;
