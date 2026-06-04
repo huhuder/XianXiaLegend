@@ -114,22 +114,37 @@ var MysticRealm = (function () {
     }
 
     /* ===========================================
-       存档读写
+       存档读写（从 Game.data 读写，迁移前兼容旧 localStorage）
        =========================================== */
     function loadState() {
-        try {
-            var raw = localStorage.getItem('mysticRealm');
-            if (raw) {
-                var saved = JSON.parse(raw);
-                state.tokens = saved.tokens != null ? saved.tokens : CONFIG.dailyTokens;
-                state.extraBought = saved.extraBought || 0;
-                state.lastRefreshDate = saved.lastRefreshDate || '';
-                state.clearedRealms = saved.clearedRealms || [];
-            }
-        } catch(e) {}
+        if (Game && Game.data) {
+            state.tokens = Game.data.mysticRealmTokens;
+            state.extraBought = Game.data.mysticRealmExtraBought;
+            state.lastRefreshDate = Game.data.mysticRealmLastRefreshDate;
+            state.clearedRealms = Game.data.mysticRealmClearedRealms;
+        } else {
+            // 回退：Game 未初始化时从 localStorage 读取
+            try {
+                var raw = localStorage.getItem('mysticRealm');
+                if (raw) {
+                    var saved = JSON.parse(raw);
+                    state.tokens = saved.tokens != null ? saved.tokens : CONFIG.dailyTokens;
+                    state.extraBought = saved.extraBought || 0;
+                    state.lastRefreshDate = saved.lastRefreshDate || '';
+                    state.clearedRealms = saved.clearedRealms || [];
+                }
+            } catch(e) {}
+        }
     }
 
     function saveState() {
+        if (Game && Game.data) {
+            Game.data.mysticRealmTokens = state.tokens;
+            Game.data.mysticRealmExtraBought = state.extraBought;
+            Game.data.mysticRealmLastRefreshDate = state.lastRefreshDate;
+            Game.data.mysticRealmClearedRealms = state.clearedRealms;
+        }
+        // 保留旧 localStorage 作为备份（loadGame 会在迁移后清除）
         localStorage.setItem('mysticRealm', JSON.stringify({
             tokens: state.tokens,
             extraBought: state.extraBought,
@@ -156,7 +171,9 @@ var MysticRealm = (function () {
         if (h < CONFIG.refreshHour) {
             date = new Date(date.getTime() - 86400000);
         }
-        return date.getFullYear() + '-' + (date.getMonth()+1) + '-' + date.getDate();
+        var m = date.getMonth() + 1;
+        var day = date.getDate();
+        return date.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
     }
 
     /* ===========================================
@@ -180,7 +197,7 @@ var MysticRealm = (function () {
         html += '</div></div>';
 
         // 秘境列表
-        var stage = Game ? (Game.data.stage || 1) : 1;
+        var stage = Game ? Math.min(4, Math.floor(Game.data.realmIndex / 2) + 1) : 1;
         html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
         for (var i = 0; i < REALMS.length; i++) {
             var r = REALMS[i];
@@ -473,28 +490,49 @@ var MysticRealm = (function () {
 
     /* 添加秘境掉落装备 */
     function addRealmEquipment(tier) {
-        var eqTypes = ['weapon', 'armor', 'helmet', 'ring', 'amulet', 'belt'];
-        var type = eqTypes[Math.floor(Math.random() * eqTypes.length)];
+        // 兼容 Equipment.js 标准装备结构
+        // tier: 1=凡品(quality 0-1), 2=灵品(quality 1-2), 3=仙品(quality 2-3)
+        var slotNames = ['weapon', 'armor', 'helmet', 'ring', 'amulet', 'belt'];
+        var slotIndex = Math.floor(Math.random() * 6);
         var tierNames = { 1: '凡品', 2: '灵品', 3: '仙品' };
-        var typeNames = { weapon: '剑', armor: '甲', helmet: '盔', ring: '戒', amulet: '坠', belt: '带' };
+        var slotDisplay = { 0: '剑', 1: '甲', 2: '盔', 3: '戒', 4: '坠', 5: '带' };
         var names = ['玄铁', '流云', '破军', '星陨', '天罡', '紫霄', '龙渊', '凤鸣'];
+
+        var qualityIndex = tier === 1 ? Math.floor(Math.random() * 2) :
+                           tier === 2 ? 1 + Math.floor(Math.random() * 2) :
+                           2 + Math.floor(Math.random() * 2);
+
+        var mult = [1.0, 1.5, 2.0, 3.0][qualityIndex] || 1.0;
+        var baseAtk = Math.floor((tier * 3 + Math.random() * tier * 5) * mult);
+        var baseDef = Math.floor((tier * 2 + Math.random() * tier * 3) * mult);
+        var baseHp  = Math.floor((tier * 10 + Math.random() * tier * 10) * mult);
+
+        var effects = [];
+        if (tier >= 2 && Math.random() < 0.3) {
+            effects.push({ type: 'critRate', value: Math.floor(Math.random() * tier * 3) });
+        }
+        if (tier >= 3 && Math.random() < 0.3) {
+            effects.push({ type: 'lifesteal', value: Math.floor(Math.random() * tier * 2) });
+        }
 
         var eq = {
             id: Date.now() + '_' + Math.floor(Math.random() * 10000),
-            name: tierNames[tier] + ' · ' + names[Math.floor(Math.random() * names.length)] + typeNames[type],
+            name: tierNames[tier] + ' · ' + names[Math.floor(Math.random() * names.length)] + slotDisplay[slotIndex],
+            quality: qualityIndex,
+            slot: slotIndex,
+            baseAtk: baseAtk,
+            baseDef: baseDef,
+            baseHp: baseHp,
+            atk: baseAtk,
+            def: baseDef,
+            hp: baseHp,
+            enhance: 0,
             tier: tier,
-            type: type,
-            atk: Math.floor((tier * 3 + Math.random() * tier * 5)),
-            def: Math.floor((tier * 2 + Math.random() * tier * 3)),
-            effects: {},
+            mapIndex: tier - 1,
+            effects: effects,
+            setName: null,
+            setSlotName: null,
         };
-
-        if (tier >= 2 && Math.random() < 0.3) {
-            eq.effects.critRate = Math.floor(Math.random() * tier * 3);
-        }
-        if (tier >= 3 && Math.random() < 0.3) {
-            eq.effects.lifesteal = Math.floor(Math.random() * tier * 2);
-        }
 
         Game.data.inventory.push(eq);
     }
@@ -554,7 +592,9 @@ var MysticRealm = (function () {
        =========================================== */
     function fleeRealm() {
         state.inBattle = false;
+        state.tokens++;
         saveState();
+        showToast('已撤退，返还1枚秘境令', 2000);
         render();
     }
 

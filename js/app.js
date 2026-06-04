@@ -24,6 +24,7 @@ var Game = {
         spiritStones: 0,        // 灵石
         totalCultivations: 0,   // 累计修炼次数
         hp: 100,                // 生命
+        maxHp: 100,             // 生命上限
         attack: 20,             // 攻击
         defense: 10,            // 防御
         critRate: 0.05,         // 暴击率
@@ -54,6 +55,11 @@ var Game = {
         skillBuffs: [],           // 技能Buff [{ type, value, remaining }]
         skillShield: 0,           // 当前护盾值
         skillSlots: 2,            // 技能槽数量（飞升+1）
+        // 秘境系统（第10批新增）
+        mysticRealmTokens: 5,           // 秘境令数量
+        mysticRealmExtraBought: 0,      // 已购买的额外秘境令
+        mysticRealmLastRefreshDate: '', // 秘境每日刷新日期
+        mysticRealmClearedRealms: [],   // 今日已通关的秘境ID列表
     },
 
     /** 运行时游戏数据（初始化为默认值） */
@@ -456,6 +462,24 @@ var Game = {
             }
             if (this.data.skillSlots === undefined || this.data.skillSlots === null) {
                 this.data.skillSlots = 2;
+            }
+            // 秘境系统兼容 + 旧 localStorage 迁移（第10批）
+            if (this.data.mysticRealmTokens === undefined) {
+                // 尝试从旧 localStorage 迁移
+                try {
+                    var oldRealm = JSON.parse(localStorage.getItem('mysticRealm'));
+                    if (oldRealm) {
+                        this.data.mysticRealmTokens = oldRealm.tokens != null ? oldRealm.tokens : 5;
+                        this.data.mysticRealmExtraBought = oldRealm.extraBought || 0;
+                        this.data.mysticRealmLastRefreshDate = oldRealm.lastRefreshDate || '';
+                        this.data.mysticRealmClearedRealms = oldRealm.clearedRealms || [];
+                        localStorage.removeItem('mysticRealm'); // 迁移后清除旧数据
+                    }
+                } catch (e) {}
+                if (this.data.mysticRealmTokens === undefined) this.data.mysticRealmTokens = 5;
+                if (this.data.mysticRealmExtraBought === undefined) this.data.mysticRealmExtraBought = 0;
+                if (this.data.mysticRealmLastRefreshDate === undefined) this.data.mysticRealmLastRefreshDate = '';
+                if (!this.data.mysticRealmClearedRealms) this.data.mysticRealmClearedRealms = [];
             }
 
             return true;

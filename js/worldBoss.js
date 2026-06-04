@@ -652,13 +652,26 @@ var WorldBoss = {
             bd.hp = this.battleBossHp;
         }
 
-        // 更新排行榜
+        // 更新排行榜（去重：同一玩家只保留最高伤害记录）
         if (!bd.topDamage) bd.topDamage = [];
-        bd.topDamage.push({
-            name: Game.data.playerName,
-            damage: totalDamage,
-            timestamp: Date.now()
-        });
+        var existingIdx = -1;
+        for (var ei = 0; ei < bd.topDamage.length; ei++) {
+            if (bd.topDamage[ei].name === Game.data.playerName) {
+                if (totalDamage > bd.topDamage[ei].damage) {
+                    bd.topDamage[ei].damage = totalDamage;
+                    bd.topDamage[ei].timestamp = Date.now();
+                }
+                existingIdx = ei;
+                break;
+            }
+        }
+        if (existingIdx < 0) {
+            bd.topDamage.push({
+                name: Game.data.playerName,
+                damage: totalDamage,
+                timestamp: Date.now()
+            });
+        }
         // 排序取前10
         bd.topDamage.sort(function (a, b) { return b.damage - a.damage; });
         if (bd.topDamage.length > 10) bd.topDamage = bd.topDamage.slice(0, 10);
@@ -761,16 +774,5 @@ var WorldBoss = {
         showToast('购买成功！挑战次数+1', 2000);
         this.renderBossList();
     },
-
-    /* ----------------------------------------------------------
-       初始化（独立Tab懒加载时调用）
-       ---------------------------------------------------------- */
-    init: function () {
-        // 确保 bossData 和挑战次数字段存在
-        if (!Game.data.bossData) Game.data.bossData = [];
-        if (Game.data.bossChallenges === undefined) Game.data.bossChallenges = 3;
-        if (Game.data.bossExtraChances === undefined) Game.data.bossExtraChances = 0;
-        if (Game.data.bossLastResetDate === undefined) Game.data.bossLastResetDate = '';
-    }
 
 };

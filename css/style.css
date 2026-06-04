@@ -531,6 +531,11 @@ body {
     border-color: var(--gold-border);
     color: var(--gold-main);
 }
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 6px;
+}
 
 /* ============================================================
    战斗系统（第1批）
