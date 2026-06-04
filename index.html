@@ -161,7 +161,16 @@
 
         <!-- ========== 宗门Tab ========== -->
         <div class="tab-page" id="tab-sect">
-            <div id="sect-page-content"></div>
+            <div class="sub-tabs">
+                <button class="sub-tab-btn active" data-sub="sect-info">宗门</button>
+                <button class="sub-tab-btn" data-sub="beast">灵兽</button>
+            </div>
+            <div id="sub-sect-info" class="sub-page active">
+                <div id="sect-page-content"></div>
+            </div>
+            <div id="sub-beast" class="sub-page">
+                <div id="beast-content"></div>
+            </div>
         </div>
 
         <!-- ========== 世界Tab ========== -->
@@ -219,6 +228,7 @@
 <script src="js/talents.js"></script>
 <script src="js/skills.js"></script>
 <script src="js/sect.js"></script>
+<script src="js/beast.js"></script>
 <script src="js/worldBoss.js"></script>
 <script src="js/mysticRealm.js"></script>
 <script src="js/ascension.js"></script>

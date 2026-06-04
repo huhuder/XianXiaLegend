@@ -63,6 +63,9 @@ var Game = {
         mysticRealmExtraBought: 0,      // 已购买的额外秘境令
         mysticRealmLastRefreshDate: '', // 秘境每日刷新日期
         mysticRealmClearedRealms: [],   // 今日已通关的秘境ID列表
+        capturedBeasts: [],          // 已捕捉灵兽
+        activeBeastIdx: -1,          // 出战灵兽索引
+        beastFood: 0,               // 灵兽口粮
     },
 
     /** 运行时游戏数据（初始化为默认值） */
@@ -239,6 +242,7 @@ var Game = {
         if (tabName === 'sect') {
             if (!this._sectInit) {
                 Sect.init();
+                this._initSectSubTabs();
                 this._sectInit = true;
             }
             Sect.renderSectPage();
@@ -473,6 +477,16 @@ var Game = {
                 if (this.data.mysticRealmLastRefreshDate === undefined) this.data.mysticRealmLastRefreshDate = '';
                 if (!this.data.mysticRealmClearedRealms) this.data.mysticRealmClearedRealms = [];
             }
+            // 灵兽系统兼容（第11批新增）
+            if (!this.data.capturedBeasts || !Array.isArray(this.data.capturedBeasts)) {
+                this.data.capturedBeasts = [];
+            }
+            if (this.data.activeBeastIdx === undefined || this.data.activeBeastIdx === null) {
+                this.data.activeBeastIdx = -1;
+            }
+            if (this.data.beastFood === undefined || this.data.beastFood === null) {
+                this.data.beastFood = 0;
+            }
 
             return true;
         } catch (e) {
@@ -540,6 +554,38 @@ var Game = {
                 // 切换到秘境时懒加载
                 if (sub === 'realm' && typeof MysticRealm !== 'undefined') {
                     MysticRealm.render();
+                }
+            });
+        }
+    },
+
+    /* ----------------------------------------------------------
+       初始化宗门Tab子Tab切换
+       ---------------------------------------------------------- */
+    _initSectSubTabs: function () {
+        var sectTab = document.getElementById('tab-sect');
+        if (!sectTab) return;
+        var subBtns = sectTab.querySelectorAll('.sub-tab-btn');
+        for (var i = 0; i < subBtns.length; i++) {
+            subBtns[i].addEventListener('click', function () {
+                var sub = this.getAttribute('data-sub');
+                // 切换按钮高亮
+                var allBtns = sectTab.querySelectorAll('.sub-tab-btn');
+                for (var b = 0; b < allBtns.length; b++) {
+                    allBtns[b].classList.remove('active');
+                }
+                this.classList.add('active');
+                // 切换子页面
+                var allPages = sectTab.querySelectorAll('.sub-page');
+                for (var p = 0; p < allPages.length; p++) {
+                    allPages[p].classList.remove('active');
+                }
+                var target = document.getElementById('sub-' + sub);
+                if (target) target.classList.add('active');
+
+                // 切换到灵兽时渲染
+                if (sub === 'beast' && typeof Beast !== 'undefined') {
+                    Beast.renderBeastTab();
                 }
             });
         }

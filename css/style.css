@@ -2542,3 +2542,167 @@ body {
     border: 1px solid rgba(255, 215, 0, 0.2);
     font-family: var(--font-title);
 }
+
+/* ============================================================
+   灵兽系统（第11-1批）
+   ============================================================ */
+
+/* 图鉴头部 */
+.beast-header {
+    text-align: center;
+    margin-bottom: 12px;
+    padding: 12px 0 8px;
+}
+
+.beast-header-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--gold-highlight);
+    font-family: var(--font-title);
+    letter-spacing: 4px;
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+}
+
+.beast-header-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 2px;
+}
+
+/* 统计栏 */
+.beast-stat-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 14px;
+    background: rgba(15, 52, 96, 0.25);
+    border: 1px solid rgba(184, 134, 11, 0.15);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.beast-stat-bar span:first-child {
+    color: var(--gold-main);
+    font-weight: bold;
+}
+
+/* 图鉴网格 */
+.beast-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+}
+
+@media (max-width: 400px) {
+    .beast-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* 单个灵兽卡片 */
+.beast-card {
+    border: 2px solid;
+    border-radius: var(--radius-md);
+    padding: 10px 8px;
+    background: rgba(15, 52, 96, 0.25);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.beast-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.04), transparent 65%);
+    pointer-events: none;
+}
+
+.beast-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(212, 165, 116, 0.15);
+}
+
+/* 已捕捉卡片高亮 */
+.beast-card.captured {
+    background: rgba(15, 52, 96, 0.4);
+    border-width: 2px;
+}
+
+.beast-card.captured::before {
+    background: radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.08), transparent 65%);
+}
+
+/* 品质角标 */
+.beast-card-quality {
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+    font-family: var(--font-title);
+}
+
+/* 图标 */
+.beast-card-icon {
+    font-size: 28px;
+    margin-bottom: 4px;
+}
+
+/* 名称 */
+.beast-card-name {
+    font-size: 13px;
+    font-weight: bold;
+    font-family: var(--font-title);
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+}
+
+/* 类型 */
+.beast-card-type {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+/* 等级/星级 */
+.beast-card-level {
+    font-size: 11px;
+    color: var(--gold-main);
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+/* 未知状态 */
+.beast-card-unknown {
+    font-size: 16px;
+    color: #555;
+    font-weight: bold;
+    font-family: var(--font-title);
+    letter-spacing: 2px;
+    padding: 4px 0;
+}
+
+/* 四维属性（紧凑排列） */
+.beast-card-stats {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 10px;
+}
+
+.beast-card-stats span {
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-secondary);
+}
+
+.beast-card-stats .bs-atk { color: var(--atk-color); }
+.beast-card-stats .bs-hp  { color: var(--hp-color);  }
+.beast-card-stats .bs-def { color: var(--def-color); }
+.beast-card-stats .bs-crit { color: var(--gold-highlight); }
