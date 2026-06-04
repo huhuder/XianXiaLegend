@@ -66,6 +66,8 @@ var Game = {
         capturedBeasts: [],          // 已捕捉灵兽
         activeBeastIdx: -1,          // 出战灵兽索引
         beastFood: 0,               // 灵兽口粮
+        beastCaptureDate: '',        // 捕捉刷新日期 'YYYY-MM-DD'
+        beastCaptureSlots: [],       // 当前捕捉槽位灵兽名列表
     },
 
     /** 运行时游戏数据（初始化为默认值） */
@@ -486,6 +488,12 @@ var Game = {
             }
             if (this.data.beastFood === undefined || this.data.beastFood === null) {
                 this.data.beastFood = 0;
+            }
+            if (this.data.beastCaptureDate === undefined || this.data.beastCaptureDate === null) {
+                this.data.beastCaptureDate = '';
+            }
+            if (!this.data.beastCaptureSlots || !Array.isArray(this.data.beastCaptureSlots)) {
+                this.data.beastCaptureSlots = [];
             }
 
             return true;

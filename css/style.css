@@ -2706,3 +2706,221 @@ body {
 .beast-card-stats .bs-hp  { color: var(--hp-color);  }
 .beast-card-stats .bs-def { color: var(--def-color); }
 .beast-card-stats .bs-crit { color: var(--gold-highlight); }
+
+/* ============================================================
+   灵兽捕捉系统（第11-2批）
+   ============================================================ */
+
+/* 捕捉入口按钮 */
+.beast-capture-entry {
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.beast-btn {
+    padding: 10px 24px;
+    border: 1px solid;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-title);
+    font-size: 14px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+}
+
+.beast-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(184, 134, 11, 0.3);
+}
+
+.beast-btn-capture-entry {
+    background: linear-gradient(135deg, rgba(212, 165, 116, 0.2), rgba(255, 215, 0, 0.1));
+    border-color: var(--gold-border);
+    color: var(--gold-highlight);
+    width: 100%;
+    max-width: 280px;
+}
+
+.beast-btn-capture-entry:hover {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.35);
+}
+
+.beast-btn-refresh {
+    background: rgba(52, 152, 219, 0.15);
+    border-color: #3498db;
+    color: #3498db;
+    flex: 1;
+    max-width: 160px;
+}
+
+.beast-btn-refresh:hover {
+    box-shadow: 0 0 14px rgba(52, 152, 219, 0.35);
+}
+
+.beast-btn-back {
+    background: rgba(160, 144, 128, 0.12);
+    border-color: var(--text-secondary);
+    color: var(--text-secondary);
+    flex: 1;
+    max-width: 160px;
+}
+
+.beast-btn-back:hover {
+    box-shadow: 0 0 14px rgba(160, 144, 128, 0.3);
+}
+
+/* 资源栏 */
+.beast-resource-bar {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    background: rgba(15, 52, 96, 0.35);
+    border: 1px solid rgba(184, 134, 11, 0.2);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.br-stone { color: #ffd700; font-weight: bold; }
+.br-token { color: #9b59b6; font-weight: bold; }
+.br-food { color: #e67e22; font-weight: bold; }
+
+/* 可捕捉品质提示 */
+.beast-capture-info {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+}
+
+.beast-capture-info span {
+    font-weight: bold;
+    margin: 0 2px;
+}
+
+/* 捕捉网格 */
+.beast-capture-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+/* 捕捉卡片 */
+.capture-card {
+    border: 2px solid;
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    background: rgba(15, 52, 96, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+}
+
+.capture-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 20% 50%, rgba(255, 215, 0, 0.04), transparent 55%);
+    pointer-events: none;
+}
+
+.capture-card:hover {
+    box-shadow: 0 0 16px rgba(212, 165, 116, 0.12);
+}
+
+.capture-card-icon {
+    font-size: 32px;
+    min-width: 42px;
+    text-align: center;
+    line-height: 1;
+}
+
+.capture-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.capture-card-quality {
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    font-family: var(--font-title);
+}
+
+.capture-card-name {
+    font-size: 14px;
+    font-weight: bold;
+    font-family: var(--font-title);
+    letter-spacing: 1px;
+    margin-top: 1px;
+}
+
+.capture-card-type {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+
+.capture-card-preview {
+    margin-top: 3px;
+    font-size: 10px;
+    display: flex;
+    gap: 8px;
+}
+
+.capture-card-preview .cp-atk { color: var(--atk-color); }
+.capture-card-preview .cp-hp  { color: var(--hp-color);  }
+.capture-card-preview .cp-def { color: var(--def-color); }
+
+.capture-card-cost {
+    font-size: 11px;
+    color: var(--gold-main);
+    margin-top: 3px;
+}
+
+.capture-btn {
+    padding: 8px 16px;
+    border: 1px solid #27ae60;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, rgba(46, 204, 113, 0.2), rgba(39, 174, 96, 0.12));
+    color: #2ecc71;
+    font-family: var(--font-title);
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.capture-btn:hover {
+    background: linear-gradient(135deg, rgba(46, 204, 113, 0.4), rgba(39, 174, 96, 0.3));
+    box-shadow: 0 0 14px rgba(46, 204, 113, 0.35);
+    transform: translateY(-1px);
+}
+
+/* 无灵兽提示 */
+.beast-no-capture {
+    text-align: center;
+    padding: 28px 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+    letter-spacing: 1px;
+}
+
+/* 操作按钮行 */
+.beast-capture-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 4px;
+}
