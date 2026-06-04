@@ -48,6 +48,12 @@ var Game = {
             body: 0,
             qi: 0
         },
+        // 技能系统（第8批新增）
+        equippedSkills: [],       // 已装备技能ID列表 [skillId, ...]
+        skillCooldowns: {},       // 技能冷却 { skillId: remainingTicks }
+        skillBuffs: [],           // 技能Buff [{ type, value, remaining }]
+        skillShield: 0,           // 当前护盾值
+        skillSlots: 2,            // 技能槽数量（飞升+1）
     },
 
     /** 运行时游戏数据（初始化为默认值） */
@@ -432,6 +438,22 @@ var Game = {
                 if (this.data.talents.sword === undefined) this.data.talents.sword = 0;
                 if (this.data.talents.body === undefined) this.data.talents.body = 0;
                 if (this.data.talents.qi === undefined) this.data.talents.qi = 0;
+            }
+            // 技能系统兼容（第8批新增）
+            if (!this.data.equippedSkills || !Array.isArray(this.data.equippedSkills)) {
+                this.data.equippedSkills = [];
+            }
+            if (!this.data.skillCooldowns || typeof this.data.skillCooldowns !== 'object') {
+                this.data.skillCooldowns = {};
+            }
+            if (!this.data.skillBuffs || !Array.isArray(this.data.skillBuffs)) {
+                this.data.skillBuffs = [];
+            }
+            if (this.data.skillShield === undefined || this.data.skillShield === null) {
+                this.data.skillShield = 0;
+            }
+            if (this.data.skillSlots === undefined || this.data.skillSlots === null) {
+                this.data.skillSlots = 2;
             }
 
             return true;

@@ -1132,7 +1132,7 @@ var Equipment = {
                 var target = document.getElementById('sub-' + sub);
                 if (target) target.classList.add('active');
 
-                // 控制修炼区和进度条（仅在属性页显示）
+                // 控制修炼区、进度条和子Tab（仅在属性页显示）
                 var cultArea = document.getElementById('cultivation-area');
                 var realmBar = document.querySelector('.realm-progress-bar');
                 var showCult = (sub === 'stats');
@@ -1146,6 +1146,8 @@ var Equipment = {
                     self.renderEquipped();
                 } else if (sub === 'talents' && typeof Talents !== 'undefined') {
                     Talents.render();
+                } else if (sub === 'skills' && typeof Skills !== 'undefined') {
+                    Skills.render();
                 }
             });
         }
