@@ -399,7 +399,7 @@ var Skills = {
                 html += '<span class="skill-card-cd-text">CD:' + skCd + '</span>';
             }
             if (lv < maxLv) {
-                html += '<button class="skill-upgrade-btn" onclick="event.stopPropagation();Skills.upgradeSkill(\'' + sk.id + '\');Skills.render();">升级 ' + formatNum(upgradeCost) + '灵</button>';
+                html += '<button class="skill-upgrade-btn" onclick="event.stopPropagation();Skills.upgradeSkill(\'' + sk.id + '\');Skills.render();">升级 ' + formatNumber(upgradeCost) + '灵</button>';
             } else {
                 html += '<span class="skill-max-tag">MAX</span>';
             }
@@ -563,7 +563,7 @@ var Skills = {
         }
         var cost = this.getUpgradeCost(skillId);
         if ((Game.data.spiritStones || 0) < cost) {
-            showToast('灵石不足（需 ' + formatNum(cost) + '）', 2000);
+            showToast('灵石不足（需 ' + formatNumber(cost) + '）', 2000);
             return false;
         }
         Game.data.spiritStones -= cost;
