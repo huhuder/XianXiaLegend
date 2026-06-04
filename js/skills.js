@@ -323,18 +323,19 @@ var Skills = {
 
         var slotCount = this.getSlotCount();
         var equipped = this.getEquippedSkills();
-        var allUnlocked = this.getAllUnlockedSkills();
         var html = '';
 
         // 技能槽
-        html += '<div class="skills-slots-title">技能槽 (' + slotCount + '个)</div>';
+        html += '<div class="skills-section-title">技能槽 <span class="skills-count">' + slotCount + '个</span></div>';
         html += '<div class="skills-slots">';
         for (var s = 0; s < slotCount; s++) {
             var eqSkillId = equipped[s] || null;
             var eqSkill = eqSkillId ? this.findSkillById(eqSkillId) : null;
             var cd = eqSkillId ? this.getCooldown(eqSkillId) : 0;
+            var cdPct = eqSkill ? (1 - cd / eqSkill.cd) * 100 : 0;
             html += '<div class="skill-slot' + (eqSkill ? ' filled' : '') + '" data-slot="' + s + '">';
             if (eqSkill) {
+                html += '<div class="skill-slot-cd-bar" style="width:' + cdPct + '%"></div>';
                 html += '<span class="skill-slot-icon">' + eqSkill.icon + '</span>';
                 html += '<span class="skill-slot-name">' + eqSkill.name + '</span>';
                 if (cd > 0) {
@@ -350,29 +351,166 @@ var Skills = {
         }
         html += '</div>';
 
-        // 已解锁技能列表
-        html += '<div class="skills-list-title">已解锁技能 (' + allUnlocked.length + '个)</div>';
+        // 通用技能
+        var commonSkills = this.getUnlockedCommonSkills();
+        html += this._renderSkillGroup('通用技能', commonSkills, equipped, 'gold');
+
+        // 宗门技能
+        var sectSkills = this.getUnlockedSectSkills();
+        if (sectSkills.length > 0) {
+            html += this._renderSkillGroup('宗门技能', sectSkills, equipped, 'purple');
+        }
+
+        container.innerHTML = html;
+    },
+
+    /* ----------------------------------------------------------
+       渲染技能分组
+       ---------------------------------------------------------- */
+    _renderSkillGroup: function (title, skills, equipped, colorClass) {
+        if (skills.length === 0) return '';
+        var html = '';
+        html += '<div class="skills-section-title skills-section-' + colorClass + '">' + title + ' <span class="skills-count">' + skills.length + '个</span></div>';
         html += '<div class="skills-list">';
-        for (var k = 0; k < allUnlocked.length; k++) {
-            var sk = allUnlocked[k];
+        for (var k = 0; k < skills.length; k++) {
+            var sk = skills[k];
             var isEquipped = equipped.indexOf(sk.id) >= 0;
             var skCd = this.getCooldown(sk.id);
-            html += '<div class="skill-card' + (isEquipped ? ' equipped' : '') + '">';
+            var cdPct = (1 - skCd / sk.cd) * 100;
+            var typeLabel = this._getTypeLabel(sk.type);
+            html += '<div class="skill-card' + (isEquipped ? ' equipped' : '') + '" onclick="Skills._toggleDetail(event, \'' + sk.id + '\')">';
+            html += '<div class="skill-card-left">';
             html += '<span class="skill-card-icon">' + sk.icon + '</span>';
             html += '<div class="skill-card-info">';
             html += '<div class="skill-card-name">' + sk.name + '</div>';
-            html += '<div class="skill-card-desc">' + sk.desc + ' | CD:' + sk.cd + 'tick</div>';
+            html += '<div class="skill-card-meta"><span class="skill-type-tag skill-type-' + sk.type + '">' + typeLabel + '</span> CD:' + sk.cd + 'tick</div>';
+            html += '<div class="skill-card-detail" id="skill-detail-' + sk.id + '" style="display:none">' + this._getDetailText(sk) + '</div>';
             html += '</div>';
+            html += '</div>';
+            html += '<div class="skill-card-right">';
+            if (skCd > 0) {
+                html += '<div class="skill-card-cd-bar" style="width:' + cdPct + '%"></div>';
+                html += '<span class="skill-card-cd-text">CD:' + skCd + '</span>';
+            }
             if (!isEquipped) {
-                html += '<button class="skill-equip-btn" onclick="Skills.equipSkill(\'' + sk.id + '\',' + (equipped.indexOf(null) >= 0 ? equipped.indexOf(null) : 0) + ');Skills.render();">装备</button>';
+                html += '<button class="skill-equip-btn" onclick="event.stopPropagation();Skills.equipSkill(\'' + sk.id + '\',' + (equipped.indexOf(null) >= 0 ? equipped.indexOf(null) : 0) + ');Skills.render();">装备</button>';
             } else {
                 html += '<span class="skill-equipped-tag">已装备</span>';
             }
             html += '</div>';
+            html += '</div>';
         }
         html += '</div>';
+        return html;
+    },
 
-        container.innerHTML = html;
-    }
+    /* ----------------------------------------------------------
+       展开/收起技能详情
+       ---------------------------------------------------------- */
+    _toggleDetail: function (event, skillId) {
+        var detail = document.getElementById('skill-detail-' + skillId);
+        if (!detail) return;
+        detail.style.display = (detail.style.display === 'none' || detail.style.display === '') ? 'block' : 'none';
+    },
 
-};
+    /* ----------------------------------------------------------
+       获取技能类型中文标签
+       ---------------------------------------------------------- */
+    _getTypeLabel: function (type) {
+        var map = {
+            'damage': '伤害', 'aoe': 'AoE', 'multi_hit': '多段', 'execute': '斩杀',
+            'dot': '灼烧', 'stun': '麻痹', 'lifesteal': '吸血', 'sacrifice': '牺牲',
+            'heal': '回复', 'shield': '护盾', 'buff_atk': '攻击↑', 'buff_all': '全能↑',
+            'dodge': '闪避↑', 'crit_dmg_buff': '暴伤↑', 'extra_attack': '连击↑',
+            'damage_reduce': '减伤↑', 'counter': '反伤', 'block': '格挡',
+            'passive': '被动'
+        };
+        return map[type] || type;
+    },
+
+    /* ----------------------------------------------------------
+       获取技能详细描述
+       ---------------------------------------------------------- */
+    _getDetailText: function (sk) {
+        var details = [];
+        switch (sk.type) {
+            case 'damage':
+                details.push('造成 ' + sk.value + '% 攻击力的直接伤害');
+                if (sk.bossBonus) details.push('对BOSS额外+' + sk.bossBonus + '%伤害');
+                break;
+            case 'aoe':
+                details.push('造成 ' + sk.value + '% 攻击力伤害');
+                details.push('溅射 ' + (sk.splash || 50) + '% 额外伤害');
+                break;
+            case 'multi_hit':
+                details.push('发动 ' + (sk.hits || 3) + ' 段攻击');
+                details.push('每段 ' + sk.value + '% 攻击力');
+                break;
+            case 'execute':
+                details.push('敌方HP<' + (sk.threshold || 25) + '% 时');
+                details.push('造成 ' + sk.value + '% 攻击力伤害');
+                details.push('HP高于斩杀线时伤害减半');
+                break;
+            case 'dot':
+                details.push('造成 ' + sk.value + '% 攻击力直接伤害');
+                details.push('附加灼烧 ' + (sk.dotDuration || 3) + ' tick');
+                break;
+            case 'stun':
+                details.push('造成 ' + sk.value + '% 攻击力伤害');
+                details.push('麻痹 ' + (sk.stunDuration || 1) + ' tick（怪物跳过攻击）');
+                break;
+            case 'lifesteal':
+                details.push('造成 ' + sk.value + '% 攻击力伤害');
+                details.push('吸血 ' + (sk.lifestealPct || 30) + '%');
+                break;
+            case 'sacrifice':
+                details.push('消耗 ' + (sk.hpCost || 15) + '% 当前生命');
+                details.push('造成 ' + sk.value + '% 攻击力伤害');
+                break;
+            case 'heal':
+                details.push('恢复 ' + sk.value + '% 最大生命');
+                break;
+            case 'shield':
+                details.push('护盾吸收 ' + sk.value + '% 攻击力的伤害');
+                details.push('持续 ' + (sk.duration || 2) + ' tick');
+                break;
+            case 'buff_atk':
+                details.push('攻击力 +' + sk.value + '%');
+                details.push('持续 ' + (sk.duration || 3) + ' tick');
+                break;
+            case 'buff_all':
+                details.push('全属性 +' + sk.value + '%');
+                details.push('持续 ' + (sk.duration || 5) + ' tick');
+                break;
+            case 'dodge':
+                details.push('闪避率 +' + sk.value + '%');
+                details.push('持续 ' + (sk.duration || 2) + ' tick');
+                break;
+            case 'crit_dmg_buff':
+                details.push('暴击伤害 +' + sk.value + '%');
+                details.push('持续 ' + (sk.duration || 3) + ' tick');
+                break;
+            case 'extra_attack':
+                details.push('每tick额外攻击 +' + sk.value + ' 次');
+                details.push('持续 ' + (sk.duration || 5) + ' tick');
+                break;
+            case 'damage_reduce':
+                details.push('受到伤害 -' + sk.value + '%');
+                details.push('持续 ' + (sk.duration || 3) + ' tick');
+                break;
+            case 'counter':
+                details.push('受击时 ' + sk.value + '% 概率反击');
+                details.push('持续 ' + (sk.duration || 2) + ' tick');
+                break;
+            case 'block':
+                details.push(sk.value + '% 概率格挡（减免80%伤害）');
+                details.push('持续 ' + (sk.duration || 3) + ' tick');
+                break;
+            case 'passive':
+                details.push('击杀敌人时回复 ' + sk.value + '% 最大生命');
+                break;
+            default:
+                details.push('造成 ' + sk.value + '% 攻击力伤害');
+        }
+        return details.join('<br>');
+    },
