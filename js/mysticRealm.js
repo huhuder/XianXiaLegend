@@ -364,15 +364,50 @@ var MysticRealm = (function () {
         if (!enemyStr) return;
         var enemyData = JSON.parse(enemyStr);
 
-        // 玩家属性
-        var pAtk = Game.data.attack || 10;
-        var pDef = Game.data.defense || 5;
+        // 计算总攻击/防御/暴击率加成（宗门+天赋+套装）
+        var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { atkPct: 0, defPct: 0 };
+        var activeBuffs = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0 };
+        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { atkPct: 0, defPct: 0, critRate: 0 };
+        var totalAtkPct = sectBonus.atkPct + activeBuffs.atkPct + talentEff.atkPct;
+        var totalDefPct = sectBonus.defPct + activeBuffs.defPct + talentEff.defPct;
+
+        // 套装加成
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses = Equipment.getActiveSetBonuses();
+            for (var si = 0; si < setBonuses.length; si++) {
+                var se = setBonuses[si].effects;
+                if (se.atkPct) totalAtkPct += se.atkPct;
+                if (se.defPct) totalDefPct += se.defPct;
+            }
+        }
+
+        var pAtk = Math.floor((Game.data.attack || 10) * (1 + totalAtkPct / 100));
+        var pDef = Math.floor((Game.data.defense || 5) * (1 + totalDefPct / 100));
         var pHp = Game.data.hp || 100;
         var pMaxHp = Game.data.maxHp || 100;
 
+        // 动态暴击率：基础 + 装备效果 + 套装 + 天赋
+        var totalCritRate = (Game.data.critRate || 0);
+        var equipped = Game.data.equipped || [];
+        for (var ei = 0; ei < equipped.length; ei++) {
+            var eq = equipped[ei];
+            if (eq && eq.effects) {
+                for (var ej = 0; ej < eq.effects.length; ej++) {
+                    if (eq.effects[ej].key === 'critRate') totalCritRate += eq.effects[ej].value / 100;
+                }
+            }
+        }
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses2 = Equipment.getActiveSetBonuses();
+            for (var sk = 0; sk < setBonuses2.length; sk++) {
+                if (setBonuses2[sk].effects.critRate) totalCritRate += setBonuses2[sk].effects.critRate / 100;
+            }
+        }
+        if (typeof Talents !== 'undefined') totalCritRate += Talents.getEffects().critRate / 100;
+
         // 玩家攻击
         var pDmg = Math.max(1, pAtk - enemyData.def * 0.5 + Math.floor(Math.random() * 6));
-        var crit = Math.random() < 0.15;
+        var crit = Math.random() < totalCritRate;
         if (crit) pDmg = Math.floor(pDmg * 1.8);
 
         enemyData.hp -= pDmg;
@@ -509,10 +544,10 @@ var MysticRealm = (function () {
 
         var effects = [];
         if (tier >= 2 && Math.random() < 0.3) {
-            effects.push({ type: 'critRate', value: Math.floor(Math.random() * tier * 3) });
+            effects.push({ name: '暴击率', key: 'critRate', value: Math.floor(Math.random() * tier * 3) });
         }
         if (tier >= 3 && Math.random() < 0.3) {
-            effects.push({ type: 'lifesteal', value: Math.floor(Math.random() * tier * 2) });
+            effects.push({ name: '吸血', key: 'lifesteal', value: Math.floor(Math.random() * tier * 2) });
         }
 
         var eq = {

@@ -28,7 +28,10 @@ var Game = {
         attack: 20,             // 攻击
         defense: 10,            // 防御
         critRate: 0.05,         // 暴击率
-        battleUnlocked: [true, false, false, false, false, false], // 已解锁地图
+        battleUnlocked: (function () {
+            var len = (typeof Battle !== 'undefined' && Battle.ZONES) ? Battle.ZONES.length : 10;
+            return [true].concat(Array(len - 1).fill(false));
+        })(), // 已解锁地图（动态匹配ZONES长度）
         inventory: [],          // 背包装备
         equipped: [null, null, null, null, null, null], // 已装备（6槽位）
         sectIndex: -1,           // 宗门索引（-1未加入，0~3四宗门）
@@ -384,8 +387,14 @@ var Game = {
             if (this.data.defense < 1) this.data.defense = 1;
 
             // 战斗系统兼容（第1批新增）
+            var zonesLen = (typeof Battle !== 'undefined' && Battle.ZONES) ? Battle.ZONES.length : 10;
             if (!this.data.battleUnlocked || !Array.isArray(this.data.battleUnlocked)) {
-                this.data.battleUnlocked = [true, false, false, false, false, false];
+                this.data.battleUnlocked = [true].concat(Array(zonesLen - 1).fill(false));
+            } else {
+                // 兼容旧档：补齐到ZONES长度
+                while (this.data.battleUnlocked.length < zonesLen) {
+                    this.data.battleUnlocked.push(false);
+                }
             }
             if (!this.data.critRate) this.data.critRate = 0.05;
             // 装备系统兼容（第2批新增）

@@ -35,6 +35,7 @@ var WorldBoss = {
     battleBossHp: 0,
     battleBossMaxHp: 0,
     battlePlayerHp: 0,
+    battlePlayerMaxHp: 0,
     battleTotalDamage: 0,
     battleBossIndex: -1,
     battleBoss: null,
@@ -464,6 +465,7 @@ var WorldBoss = {
         var activeBuffs = typeof Sect !== 'undefined' ? Sect.getActiveBuffs() : { hpPct: 0, atkPct: 0, defPct: 0 };
         var hpMult = 1 + (sectBonus.hpPct + activeBuffs.hpPct) / 100;
         this.battlePlayerHp = Math.floor(Game.data.hp * hpMult);
+        this.battlePlayerMaxHp = this.battlePlayerHp;
 
         // 更新UI为战斗状态
         this._renderBattleUI(bossIndex);
@@ -541,18 +543,53 @@ var WorldBoss = {
         var boss = this.battleBoss;
         var d = Game.data;
 
-        // 计算玩家属性（含宗门Buff + activeBuffs）
+        // 计算玩家属性（含宗门Buff + activeBuffs + 天赋 + 套装）
         var sectBonus = typeof Sect !== 'undefined' ? Sect.getSectBonus() : { atkPct: 0, defPct: 0 };
         var activeBuffs = typeof Sect !== 'undefined' ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0 };
-        var atkMult = 1 + (sectBonus.atkPct + activeBuffs.atkPct) / 100;
-        var defMult = 1 + (sectBonus.defPct + activeBuffs.defPct) / 100;
+        var talentEff = typeof Talents !== 'undefined' ? Talents.getEffects() : { atkPct: 0, defPct: 0, critRate: 0 };
+        var totalAtkPct = sectBonus.atkPct + activeBuffs.atkPct + talentEff.atkPct;
+        var totalDefPct = sectBonus.defPct + activeBuffs.defPct + talentEff.defPct;
+
+        // 套装加成
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses = Equipment.getActiveSetBonuses();
+            for (var si = 0; si < setBonuses.length; si++) {
+                var se = setBonuses[si].effects;
+                if (se.atkPct) totalAtkPct += se.atkPct;
+                if (se.defPct) totalDefPct += se.defPct;
+            }
+        }
+
+        var atkMult = 1 + totalAtkPct / 100;
+        var defMult = 1 + totalDefPct / 100;
 
         var playerAtk = Math.floor(d.attack * atkMult);
         var playerDef = Math.floor(d.defense * defMult);
 
-        // 玩家伤害：max(1, 玩家ATK * (0.8~1.2随机) - BossDEF * 0.3)
+        // 动态暴击率：基础 + 装备效果 + 套装 + 天赋
+        var totalCritRate = (d.critRate || 0);
+        var equipped = d.equipped || [];
+        for (var ei = 0; ei < equipped.length; ei++) {
+            var eq = equipped[ei];
+            if (eq && eq.effects) {
+                for (var ej = 0; ej < eq.effects.length; ej++) {
+                    if (eq.effects[ej].key === 'critRate') totalCritRate += eq.effects[ej].value / 100;
+                }
+            }
+        }
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses2 = Equipment.getActiveSetBonuses();
+            for (var sk2 = 0; sk2 < setBonuses2.length; sk2++) {
+                if (setBonuses2[sk2].effects.critRate) totalCritRate += setBonuses2[sk2].effects.critRate / 100;
+            }
+        }
+        totalCritRate += talentEff.critRate / 100;
+
+        // 玩家伤害：max(1, 玩家ATK * (0.8~1.2随机) - BossDEF * 0.3)，暴击1.5倍
         var playerRaw = playerAtk * (0.8 + Math.random() * 0.4);
+        var isCrit = Math.random() < totalCritRate;
         var playerDmg = Math.max(1, Math.floor(playerRaw - boss.def * 0.3));
+        if (isCrit) playerDmg = Math.floor(playerDmg * 1.5);
 
         // Boss伤害：max(1, BossATK * (0.8~1.2随机) - 玩家DEF * 0.4)
         var bossRaw = boss.atk * (0.8 + Math.random() * 0.4);
@@ -566,7 +603,7 @@ var WorldBoss = {
 
         // 更新UI
         var bossHpPct = Math.max(0, Math.floor(this.battleBossHp / this.battleBossMaxHp * 100));
-        var playerHpPct = Math.max(0, Math.floor(this.battlePlayerHp / Math.max(1, Game.data.hp) * 100));
+        var playerHpPct = Math.max(0, Math.floor(this.battlePlayerHp / Math.max(1, this.battlePlayerMaxHp) * 100));
 
         var bossFill = document.getElementById('battle-boss-hp-fill');
         var bossText = document.getElementById('battle-boss-hp-text');
@@ -578,7 +615,7 @@ var WorldBoss = {
         if (bossFill) bossFill.style.width = bossHpPct + '%';
         if (bossText) bossText.textContent = formatNumber(this.battleBossHp) + ' / ' + formatNumber(this.battleBossMaxHp);
         if (playerFill) playerFill.style.width = playerHpPct + '%';
-        if (playerText) playerText.textContent = formatNumber(this.battlePlayerHp) + ' / ' + formatNumber(Game.data.hp);
+        if (playerText) playerText.textContent = formatNumber(this.battlePlayerHp) + ' / ' + formatNumber(this.battlePlayerMaxHp);
         if (timerEl) timerEl.textContent = '剩余 ' + (this.battleMaxTick - this.battleTick) + ' 秒';
         if (totalDmgEl) totalDmgEl.textContent = '总伤害：' + formatNumber(this.battleTotalDamage);
 

@@ -220,16 +220,48 @@ var Ascension = {
         var trib = TRIBULATIONS[this.currentWave];
         var d = Game.data;
 
-        // 玩家属性（含宗门加成）
+        // 玩家属性（含宗门+天赋+套装加成）
         var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { atkPct: 0, defPct: 0, hpPct: 0 };
         var buffBonus = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0, hpPct: 0 };
+        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { atkPct: 0, defPct: 0, critRate: 0 };
+        var totalAtkPct = sectBonus.atkPct + buffBonus.atkPct + talentEff.atkPct;
+        var totalDefPct = sectBonus.defPct + buffBonus.defPct + talentEff.defPct;
 
-        var effectiveAtk = Math.floor(d.attack * (1 + sectBonus.atkPct / 100 + buffBonus.atkPct / 100));
-        var effectiveDef = Math.floor(d.defense * (1 + sectBonus.defPct / 100 + buffBonus.defPct / 100));
+        // 套装加成
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses = Equipment.getActiveSetBonuses();
+            for (var si = 0; si < setBonuses.length; si++) {
+                var se = setBonuses[si].effects;
+                if (se.atkPct) totalAtkPct += se.atkPct;
+                if (se.defPct) totalDefPct += se.defPct;
+            }
+        }
+
+        var effectiveAtk = Math.floor(d.attack * (1 + totalAtkPct / 100));
+        var effectiveDef = Math.floor(d.defense * (1 + totalDefPct / 100));
+
+        // 动态暴击率：基础 + 装备效果 + 套装 + 天赋
+        var totalCritRate = (d.critRate || 0.05);
+        var equipped = d.equipped || [];
+        for (var ei = 0; ei < equipped.length; ei++) {
+            var eq = equipped[ei];
+            if (eq && eq.effects) {
+                for (var ej = 0; ej < eq.effects.length; ej++) {
+                    if (eq.effects[ej].key === 'critRate') totalCritRate += eq.effects[ej].value / 100;
+                }
+            }
+        }
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses2 = Equipment.getActiveSetBonuses();
+            for (var sk2 = 0; sk2 < setBonuses2.length; sk2++) {
+                if (setBonuses2[sk2].effects.critRate) totalCritRate += setBonuses2[sk2].effects.critRate / 100;
+            }
+        }
+        totalCritRate += talentEff.critRate / 100;
 
         // 玩家攻击天劫
         var baseDmg = effectiveAtk * random(0.8, 1.2);
-        var isCrit = Math.random() < (d.critRate || 0.05);
+        var isCrit = Math.random() < totalCritRate;
         var playerDmg = Math.floor(isCrit ? baseDmg * 1.5 : baseDmg);
 
         this.bossHp -= playerDmg;
@@ -437,7 +469,8 @@ var Ascension = {
         Game.data.experience = 0;
 
         // 重置地图解锁
-        Game.data.battleUnlocked = [true, false, false, false, false, false];
+        var zonesLen = (typeof Battle !== 'undefined') ? Battle.ZONES.length : 10;
+        Game.data.battleUnlocked = [true].concat(Array(zonesLen - 1).fill(false));
 
         Game.saveGame();
 
