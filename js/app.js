@@ -236,6 +236,7 @@ var Game = {
         if (tabName === 'world') {
             if (!this._worldInit) {
                 WorldBoss.init();
+                MysticRealm.init();
                 this._initWorldSubTabs();
                 this._worldInit = true;
             }
