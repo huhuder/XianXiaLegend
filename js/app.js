@@ -416,6 +416,47 @@ var Game = {
             if (this.data.attack < 1) this.data.attack = 1;
             if (this.data.defense < 1) this.data.defense = 1;
 
+            // HP/ATK/DEF合理性校验：根据境界层数重新计算期望值，修复异常低属性存档
+            var expectedMinHp = 100, expectedMinAtk = 20, expectedMinDef = 10;
+            for (var ri = 0; ri < this.data.realmIndex; ri++) {
+                expectedMinHp += 10 * Math.pow(2, ri) * 50;
+                expectedMinAtk += 10 * Math.pow(2, ri) * 20;
+                expectedMinDef += 10 * Math.pow(2, ri) * 15;
+            }
+            expectedMinHp += this.data.layer * Math.pow(2, this.data.realmIndex) * 50;
+            expectedMinAtk += this.data.layer * Math.pow(2, this.data.realmIndex) * 20;
+            expectedMinDef += this.data.layer * Math.pow(2, this.data.realmIndex) * 15;
+
+            // 补充已装备物品的固定属性
+            if (this.data.equipped && Array.isArray(this.data.equipped)) {
+                for (var ei = 0; ei < this.data.equipped.length; ei++) {
+                    var eq = this.data.equipped[ei];
+                    if (eq) {
+                        expectedMinHp += eq.hp || 0;
+                        expectedMinAtk += eq.atk || 0;
+                        expectedMinDef += eq.def || 0;
+                    }
+                }
+            }
+
+            var fixed = false;
+            if (this.data.hp < expectedMinHp) {
+                console.warn('[仙侠传奇] HP异常低(' + this.data.hp + ')，已修复为期望值(' + expectedMinHp + ')');
+                this.data.hp = expectedMinHp;
+                fixed = true;
+            }
+            if (this.data.attack < expectedMinAtk) {
+                console.warn('[仙侠传奇] ATK异常低(' + this.data.attack + ')，已修复为期望值(' + expectedMinAtk + ')');
+                this.data.attack = expectedMinAtk;
+                fixed = true;
+            }
+            if (this.data.defense < expectedMinDef) {
+                console.warn('[仙侠传奇] DEF异常低(' + this.data.defense + ')，已修复为期望值(' + expectedMinDef + ')');
+                this.data.defense = expectedMinDef;
+                fixed = true;
+            }
+            if (fixed) this.saveGame();
+
             // 战斗系统兼容（第1批新增）
             var zonesLen = (typeof Battle !== 'undefined' && Battle.ZONES) ? Battle.ZONES.length : 10;
             if (!this.data.battleUnlocked || !Array.isArray(this.data.battleUnlocked)) {
