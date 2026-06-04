@@ -2448,3 +2448,97 @@ body {
     border-radius: 4px;
     border: 1px solid rgba(255, 215, 0, 0.2);
 }
+
+/* ============================================================
+   详细附加属性面板
+   ============================================================ */
+.detail-stats-section {
+    margin-top: 10px;
+    border-top: 1px solid rgba(184, 134, 11, 0.2);
+    padding-top: 8px;
+}
+
+.detail-stats-toggle {
+    display: block;
+    width: 100%;
+    padding: 6px 0;
+    border: 1px solid rgba(184, 134, 11, 0.25);
+    border-radius: 6px;
+    background: rgba(184, 134, 11, 0.08);
+    color: var(--gold-main);
+    font-size: 12px;
+    font-family: var(--font-title);
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.detail-stats-toggle:hover {
+    background: rgba(184, 134, 11, 0.2);
+    border-color: var(--gold-highlight);
+    color: var(--gold-highlight);
+}
+
+.detail-stats-content {
+    margin-top: 8px;
+}
+
+.detail-stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.detail-stats-table th {
+    padding: 5px 4px;
+    text-align: center;
+    color: var(--text-muted);
+    font-weight: normal;
+    font-size: 10px;
+    border-bottom: 1px solid rgba(184, 134, 11, 0.15);
+    font-family: var(--font-title);
+    letter-spacing: 1px;
+}
+
+.detail-stats-table td {
+    padding: 5px 4px;
+    text-align: center;
+    color: var(--text-secondary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.ds-name {
+    text-align: left !important;
+    color: var(--text-primary) !important;
+    font-weight: bold;
+    font-family: var(--font-title);
+}
+
+.ds-base { color: var(--text-muted) !important; }
+.ds-equip { color: var(--atk-color) !important; }
+.ds-set { color: var(--gold-highlight) !important; }
+.ds-total {
+    color: var(--gold-highlight) !important;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.active-sets-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(184, 134, 11, 0.1);
+}
+
+.active-set-tag {
+    font-size: 10px;
+    color: var(--gold-highlight);
+    background: rgba(255, 215, 0, 0.08);
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    font-family: var(--font-title);
+}

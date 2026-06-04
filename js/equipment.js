@@ -397,6 +397,48 @@ var Equipment = {
     },
 
     /* ----------------------------------------------------------
+       汇总所有已装备装备的特殊效果和套装加成（唯一聚合入口）
+       返回对象包含所有战斗/修炼相关数值，供各处统一使用
+       @returns {object} { critRate, dodgeRate, lifesteal, bossDmg, counterRate,
+                           extraDmgPct, extraDmgChance, dmgReducePct, dmgReduceChance,
+                           killHealPct, expBonus, spiritBonus, cultSpeed }
+       ---------------------------------------------------------- */
+    getTotalEquipEffects: function () {
+        var result = {
+            critRate: 0, dodgeRate: 0, lifesteal: 0, bossDmg: 0, counterRate: 0,
+            extraDmgPct: 0, extraDmgChance: 0, dmgReducePct: 0, dmgReduceChance: 0,
+            killHealPct: 0, expBonus: 0, spiritBonus: 0, cultSpeed: 0
+        };
+
+        // 遍历已装备的6个槽位
+        var equipped = Game.data.equipped;
+        for (var i = 0; i < 6; i++) {
+            var eq = equipped[i];
+            if (eq && eq.effects) {
+                for (var j = 0; j < eq.effects.length; j++) {
+                    var ef = eq.effects[j];
+                    if (result[ef.key] !== undefined) {
+                        result[ef.key] += ef.value;
+                    }
+                }
+            }
+        }
+
+        // 遍历套装加成
+        var bonuses = this.getActiveSetBonuses();
+        for (var b = 0; b < bonuses.length; b++) {
+            var eff = bonuses[b].effects;
+            for (var key in eff) {
+                if (result[key] !== undefined) {
+                    result[key] += eff[key];
+                }
+            }
+        }
+
+        return result;
+    },
+
+    /* ----------------------------------------------------------
        获取当前激活的套装加成
        遍历已装备栏，统计各套装件数，返回所有激活的加成效果
        ---------------------------------------------------------- */

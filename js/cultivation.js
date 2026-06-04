@@ -5,70 +5,25 @@
    ============================================================ */
 
 /**
- * 汇总装备和套装的修炼速度加成
+ * 汇总装备和套装的修炼速度加成（委托到 Equipment 统一入口）
  * @returns {number} 修炼速度总值
  */
 function getEquipCultSpeed() {
-    var total = 0;
-
-    // 遍历已装备的6个槽位
-    if (Game.data && Game.data.equipped) {
-        for (var i = 0; i < 6; i++) {
-            var eq = Game.data.equipped[i];
-            if (eq && eq.effects) {
-                for (var j = 0; j < eq.effects.length; j++) {
-                    if (eq.effects[j].key === 'cultSpeed') {
-                        total += eq.effects[j].value;
-                    }
-                }
-            }
-        }
+    if (typeof Equipment !== 'undefined' && Equipment.getTotalEquipEffects) {
+        return Equipment.getTotalEquipEffects().cultSpeed || 0;
     }
-
-    // 套装加成
-    if (typeof Equipment !== 'undefined' && Equipment.getActiveSetBonuses) {
-        var bonuses = Equipment.getActiveSetBonuses();
-        for (var b = 0; b < bonuses.length; b++) {
-            if (bonuses[b].effects.cultSpeed) {
-                total += bonuses[b].effects.cultSpeed;
-            }
-        }
-    }
-
-    return total;
+    return 0;
 }
 
 /**
- * 汇总装备和套装的暴击率
+ * 汇总装备和套装的暴击率（委托到 Equipment 统一入口）
  * @returns {number} 实际暴击率（百分比整数，如5、15、23）
  */
 function getTotalCritRate() {
     var total = 5; // 基础5%
-
-    // 遍历已装备的6个槽位
-    if (Game.data && Game.data.equipped) {
-        for (var i = 0; i < 6; i++) {
-            var eq = Game.data.equipped[i];
-            if (eq && eq.effects) {
-                for (var j = 0; j < eq.effects.length; j++) {
-                    if (eq.effects[j].key === 'critRate') {
-                        total += eq.effects[j].value;
-                    }
-                }
-            }
-        }
+    if (typeof Equipment !== 'undefined' && Equipment.getTotalEquipEffects) {
+        total += Equipment.getTotalEquipEffects().critRate || 0;
     }
-
-    // 套装加成
-    if (typeof Equipment !== 'undefined' && Equipment.getActiveSetBonuses) {
-        var bonuses = Equipment.getActiveSetBonuses();
-        for (var b = 0; b < bonuses.length; b++) {
-            if (bonuses[b].effects.critRate) {
-                total += bonuses[b].effects.critRate;
-            }
-        }
-    }
-
     return total;
 }
 
@@ -292,6 +247,143 @@ var Cultivation = {
         Game.dom.hpBar.style.width = Math.min(100, (Game.data.hp / maxVal) * 100) + '%';
         Game.dom.atkBar.style.width = Math.min(100, (Game.data.attack * 3 / maxVal) * 100) + '%';
         Game.dom.defBar.style.width = Math.min(100, (Game.data.defense * 5 / maxVal) * 100) + '%';
+
+        // 详细附加属性 — 如果有装备效果则显示入口
+        this.toggleDetailSection();
+    },
+
+    /** 检测装备效果 — 有则显示「查看详细属性」入口，无则隐藏 */
+    toggleDetailSection: function () {
+        var section = document.getElementById('detail-stats-section');
+        if (!section) return;
+
+        var effects = null;
+        if (typeof Equipment !== 'undefined' && Equipment.getTotalEquipEffects) {
+            effects = Equipment.getTotalEquipEffects();
+        }
+
+        // 检查是否任何非零装备效果
+        var hasEffects = false;
+        if (effects) {
+            var keys = Object.keys(effects);
+            for (var i = 0; i < keys.length; i++) {
+                if (effects[keys[i]] > 0) { hasEffects = true; break; }
+            }
+        }
+
+        // 也检查是否有套装激活
+        var activeSets = [];
+        if (!hasEffects && typeof Equipment !== 'undefined' && Equipment.getActiveSetBonuses) {
+            activeSets = Equipment.getActiveSetBonuses();
+            hasEffects = activeSets.length > 0;
+        }
+
+        section.style.display = hasEffects ? 'block' : 'none';
+
+        // 如果当前已展开，刷新内容
+        var content = document.getElementById('detail-stats-content');
+        var btn = document.getElementById('detail-stats-toggle');
+        if (content && btn && content.style.display !== 'none') {
+            this.renderDetailStats(effects, activeSets);
+        }
+    },
+
+    /** 渲染详细属性列表 */
+    renderDetailStats: function (effects, activeSets) {
+        var content = document.getElementById('detail-stats-content');
+        if (!content) return;
+
+        if (!effects && typeof Equipment !== 'undefined' && Equipment.getTotalEquipEffects) {
+            effects = Equipment.getTotalEquipEffects();
+        }
+        if (!activeSets && typeof Equipment !== 'undefined' && Equipment.getActiveSetBonuses) {
+            activeSets = Equipment.getActiveSetBonuses();
+        }
+
+        // 属性定义：key, name, base(0=无基础值), isPercent
+        var attrs = [
+            { key: 'critRate',    name: '暴击率',      base: 5,  unit: '%' },
+            { key: 'dodgeRate',   name: '闪避率',      base: 0,  unit: '%' },
+            { key: 'lifesteal',   name: '吸血率',      base: 0,  unit: '%' },
+            { key: 'bossDmg',     name: 'Boss增伤',    base: 0,  unit: '%' },
+            { key: 'counterRate', name: '反击率',      base: 0,  unit: '%' },
+            { key: 'expBonus',    name: '经验加成',    base: 0,  unit: '%' },
+            { key: 'spiritBonus', name: '灵石加成',    base: 0,  unit: '%' },
+            { key: 'cultSpeed',   name: '修炼速度',    base: 0,  unit: '%' },
+            { key: 'killHealPct', name: '击杀回复',    base: 0,  unit: '%' },
+            { key: 'extraDmgChance', name: '额外伤害触发', base: 0, unit: '%' },
+            { key: 'extraDmgPct', name: '额外伤害倍率', base: 0, unit: '%' },
+            { key: 'dmgReduceChance', name: '减伤触发', base: 0, unit: '%' },
+            { key: 'dmgReducePct', name: '减伤比例',   base: 0,  unit: '%' }
+        ];
+
+        var html = '<table class="detail-stats-table"><thead><tr>' +
+            '<th>属性</th><th>基础值</th><th>装备加成</th><th>套装加成</th><th>总值</th>' +
+            '</tr></thead><tbody>';
+
+        for (var i = 0; i < attrs.length; i++) {
+            var a = attrs[i];
+            var equipVal = (effects && effects[a.key]) ? effects[a.key] : 0;
+
+            // 套装中该属性的贡献
+            var setVal = 0;
+            if (activeSets) {
+                for (var s = 0; s < activeSets.length; s++) {
+                    if (activeSets[s].effects && activeSets[s].effects[a.key]) {
+                        setVal += activeSets[s].effects[a.key];
+                    }
+                }
+            }
+
+            // 装备独有（扣除套装部分）——但实际上 getTotalEquipEffects 已包含套装，所以这里 equipVal 就是装备+套装总和
+            // 需要重新只统计装备本身
+            var equipOnly = equipVal - setVal;
+            if (equipOnly < 0) equipOnly = 0;
+
+            var total = a.base + equipVal;
+
+            if (total > 0 || a.key === 'critRate') {
+                html += '<tr>' +
+                    '<td class="ds-name">' + a.name + '</td>' +
+                    '<td class="ds-base">' + a.base + a.unit + '</td>' +
+                    '<td class="ds-equip">' + (equipOnly > 0 ? '+' + equipOnly + a.unit : '—') + '</td>' +
+                    '<td class="ds-set">' + (setVal > 0 ? '+' + setVal + a.unit : '—') + '</td>' +
+                    '<td class="ds-total">' + total + a.unit + '</td>' +
+                    '</tr>';
+            }
+        }
+
+        html += '</tbody></table>';
+
+        // 套装信息
+        if (activeSets && activeSets.length > 0) {
+            html += '<div class="active-sets-info">';
+            for (var b = 0; b < activeSets.length; b++) {
+                html += '<div class="active-set-tag">套装：' + activeSets[b].setName + '</div>';
+            }
+            html += '</div>';
+        }
+
+        content.innerHTML = html;
+    },
+
+    /** 初始化详细属性面板的事件监听 */
+    initDetailStats: function () {
+        var btn = document.getElementById('detail-stats-toggle');
+        if (!btn || btn._detailInit) return;
+        btn._detailInit = true;
+
+        btn.addEventListener('click', function () {
+            var content = document.getElementById('detail-stats-content');
+            if (!content) return;
+            var isHidden = content.style.display === 'none';
+            content.style.display = isHidden ? 'block' : 'none';
+            btn.textContent = isHidden ? '收起详细属性 ▲' : '查看详细属性 ▼';
+
+            if (isHidden) {
+                Cultivation.renderDetailStats();
+            }
+        });
     },
 
     /** 更新经验条 */

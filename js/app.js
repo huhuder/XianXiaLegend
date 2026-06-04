@@ -96,6 +96,9 @@ var Game = {
             console.log('[仙侠传奇] 新档初始化，欢迎踏入修仙之路！');
         }
 
+        // 初始化详细属性面板事件
+        Cultivation.initDetailStats();
+
         // 更新全部UI
         Cultivation.updateAllUI();
         this.updatePower();
@@ -309,32 +312,12 @@ var Game = {
         // 基础属性战力
         var power = d.attack * 2.5 + d.defense * 1.8 + d.hp * 0.5;
 
-        // 汇总特殊效果（转换为百分比数值）
-        var totalCritRate = (d.critRate || 0.05) * 100;
-        var totalDodgeRate = 0;
-        var totalLifesteal = 0;
+        // 使用统一聚合函数获取装备+套装效果
+        var eff = Equipment.getTotalEquipEffects();
 
-        // 遍历已装备的装备效果
-        for (var i = 0; i < 6; i++) {
-            var eq = d.equipped[i];
-            if (eq && eq.effects) {
-                for (var j = 0; j < eq.effects.length; j++) {
-                    var ef = eq.effects[j];
-                    if (ef.key === 'critRate') totalCritRate += ef.value;
-                    else if (ef.key === 'dodgeRate') totalDodgeRate += ef.value;
-                    else if (ef.key === 'lifesteal') totalLifesteal += ef.value;
-                }
-            }
-        }
-
-        // 套装加成
-        var bonuses = Equipment.getActiveSetBonuses();
-        for (var b = 0; b < bonuses.length; b++) {
-            var eff = bonuses[b].effects;
-            if (eff.critRate) totalCritRate += eff.critRate;
-            if (eff.dodgeRate) totalDodgeRate += eff.dodgeRate;
-            if (eff.lifesteal) totalLifesteal += eff.lifesteal;
-        }
+        var totalCritRate = (d.critRate || 0.05) * 100 + eff.critRate;
+        var totalDodgeRate = eff.dodgeRate;
+        var totalLifesteal = eff.lifesteal;
 
         power += totalCritRate * 30 + totalDodgeRate * 20 + totalLifesteal * 15;
 

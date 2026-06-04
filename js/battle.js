@@ -5,46 +5,16 @@
    ============================================================ */
 
 /**
- * 汇总所有已装备装备的特殊效果和套装加成
- * 每 tick 调用一次，避免重复遍历装备数组
+ * 汇总所有已装备装备的特殊效果和套装加成（委托到 Equipment 统一入口）
  * @returns {object} 汇总后的效果对象
  */
 function getEquipAndSetEffects() {
-    var result = {
-        critRate: 0, dodgeRate: 0, lifesteal: 0, bossDmg: 0, counterRate: 0,
-        extraDmgPct: 0, extraDmgChance: 0, dmgReducePct: 0, dmgReduceChance: 0,
-        killHealPct: 0, expBonus: 0, spiritBonus: 0, cultSpeed: 0
-    };
-
-    // 遍历已装备的6个槽位
-    if (Game.data && Game.data.equipped) {
-        for (var i = 0; i < 6; i++) {
-            var eq = Game.data.equipped[i];
-            if (eq && eq.effects) {
-                for (var j = 0; j < eq.effects.length; j++) {
-                    var ef = eq.effects[j];
-                    if (result[ef.key] !== undefined) {
-                        result[ef.key] += ef.value;
-                    }
-                }
-            }
-        }
+    if (typeof Equipment !== 'undefined' && Equipment.getTotalEquipEffects) {
+        return Equipment.getTotalEquipEffects();
     }
-
-    // 遍历套装加成
-    if (typeof Equipment !== 'undefined' && Equipment.getActiveSetBonuses) {
-        var bonuses = Equipment.getActiveSetBonuses();
-        for (var b = 0; b < bonuses.length; b++) {
-            var eff = bonuses[b].effects;
-            for (var key in eff) {
-                if (result[key] !== undefined) {
-                    result[key] += eff[key];
-                }
-            }
-        }
-    }
-
-    return result;
+    return { critRate:0, dodgeRate:0, lifesteal:0, bossDmg:0, counterRate:0,
+             extraDmgPct:0, extraDmgChance:0, dmgReducePct:0, dmgReduceChance:0,
+             killHealPct:0, expBonus:0, spiritBonus:0, cultSpeed:0 };
 }
 
 var Battle = {
