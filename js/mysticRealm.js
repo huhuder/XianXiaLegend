@@ -386,6 +386,13 @@ var MysticRealm = (function () {
         var pHp = Game.data.hp || 100;
         var pMaxHp = Game.data.maxHp || 100;
 
+        // 灵兽出战加成（11-4批）
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var beastBonus = Beast.getActiveBeastBonus();
+            pAtk += beastBonus.atk;
+            pDef += beastBonus.def;
+        }
+
         // 动态暴击率：基础 + 装备效果 + 套装 + 天赋
         var totalCritRate = (Game.data.critRate || 0);
         var equipped = Game.data.equipped || [];

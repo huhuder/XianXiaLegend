@@ -240,6 +240,13 @@ var Ascension = {
         var effectiveAtk = Math.floor(d.attack * (1 + totalAtkPct / 100));
         var effectiveDef = Math.floor(d.defense * (1 + totalDefPct / 100));
 
+        // 灵兽出战加成（11-4批）
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var beastBonus = Beast.getActiveBeastBonus();
+            effectiveAtk += beastBonus.atk;
+            effectiveDef += beastBonus.def;
+        }
+
         // 动态暴击率：基础 + 装备效果 + 套装 + 天赋
         var totalCritRate = (d.critRate || 0.05);
         var equipped = d.equipped || [];

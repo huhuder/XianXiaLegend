@@ -413,6 +413,13 @@ var Battle = {
         var effectiveDef = Math.floor(Game.data.defense * (1 + totalDefPct / 100));
         var effectiveHp = Math.floor(Game.data.hp * (1 + totalHpPct / 100));
 
+        // 灵兽出战加成（11-4批）
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var beastBonus = Beast.getActiveBeastBonus();
+            effectiveAtk += beastBonus.atk;
+            effectiveDef += beastBonus.def;
+        }
+
         // 技能冷却和Buff维护
         if (typeof Skills !== 'undefined') {
             Skills.tickCooldowns();

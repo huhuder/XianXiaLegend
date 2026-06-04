@@ -278,6 +278,12 @@ var Cultivation = {
             hasEffects = activeSets.length > 0;
         }
 
+        // 也检查是否有灵兽出战加成（11-4批）
+        if (!hasEffects && typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var bb = Beast.getActiveBeastBonus();
+            hasEffects = bb.atk > 0 || bb.hp > 0 || bb.def > 0 || bb.critRate > 0;
+        }
+
         section.style.display = hasEffects ? 'block' : 'none';
 
         // 如果当前已展开，刷新内容
@@ -317,6 +323,17 @@ var Cultivation = {
             { key: 'dmgReducePct', name: '减伤比例',   base: 0,  unit: '%' }
         ];
 
+        // 灵兽出战加成（11-4批）
+        var beastBonus = null;
+        var beastName = '';
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            beastBonus = Beast.getActiveBeastBonus();
+            if (Game.data.activeBeastIdx !== undefined && Game.data.activeBeastIdx >= 0 &&
+                Game.data.activeBeastIdx < Game.data.capturedBeasts.length) {
+                beastName = Game.data.capturedBeasts[Game.data.activeBeastIdx].name;
+            }
+        }
+
         var html = '<table class="detail-stats-table"><thead><tr>' +
             '<th>属性</th><th>基础值</th><th>装备加成</th><th>套装加成</th><th>总值</th>' +
             '</tr></thead><tbody>';
@@ -354,6 +371,20 @@ var Cultivation = {
         }
 
         html += '</tbody></table>';
+
+        // 灵兽出战加成行
+        if (beastBonus && (beastBonus.atk > 0 || beastBonus.hp > 0 || beastBonus.def > 0 || beastBonus.critRate > 0)) {
+            html += '<div class="beast-bonus-row" style="margin-top:8px;padding:4px 8px;' +
+                'background:rgba(192,132,252,0.08);border:1px solid rgba(192,132,252,0.2);border-radius:6px;' +
+                'font-size:12px;color:var(--text-primary);">' +
+                '<span style="color:#c084fc;font-weight:bold;">【灵兽加成】</span>' +
+                '<span style="color:#c084fc;margin-left:4px;">' + beastName + '</span>' +
+                (beastBonus.atk > 0 ? ' <span style="color:var(--atk-color);">攻击+' + beastBonus.atk + '</span>' : '') +
+                (beastBonus.hp > 0 ? ' <span style="color:var(--hp-color);"> 生命+' + beastBonus.hp + '</span>' : '') +
+                (beastBonus.def > 0 ? ' <span style="color:var(--def-color);"> 防御+' + beastBonus.def + '</span>' : '') +
+                (beastBonus.critRate > 0 ? ' <span style="color:var(--gold-highlight);"> 暴击率+' + beastBonus.critRate + '%</span>' : '') +
+                '</div>';
+        }
 
         // 套装信息
         if (activeSets && activeSets.length > 0) {

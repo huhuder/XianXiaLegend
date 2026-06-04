@@ -566,6 +566,13 @@ var WorldBoss = {
         var playerAtk = Math.floor(d.attack * atkMult);
         var playerDef = Math.floor(d.defense * defMult);
 
+        // 灵兽出战加成（11-4批）
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var beastBonus = Beast.getActiveBeastBonus();
+            playerAtk += beastBonus.atk;
+            playerDef += beastBonus.def;
+        }
+
         // 动态暴击率：基础 + 装备效果 + 套装 + 天赋
         var totalCritRate = (d.critRate || 0);
         var equipped = d.equipped || [];

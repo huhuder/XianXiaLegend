@@ -3267,9 +3267,33 @@ body {
     color: var(--text-muted);
     width: 100%;
     max-width: 240px;
+    transition: all 0.3s;
 }
 
-.beast-btn-battle.disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+.beast-btn-battle:hover {
+    opacity: 0.85;
+    transform: translateY(-1px);
+}
+
+.beast-btn-battle.deployed {
+    background: linear-gradient(135deg, rgba(46, 204, 113, 0.25), rgba(39, 174, 96, 0.12));
+    border-color: #2ecc71;
+    color: #2ecc71;
+}
+
+.beast-btn-battle.deployed:hover {
+    box-shadow: 0 0 16px rgba(46, 204, 113, 0.35);
+}
+
+/* 图鉴卡片 — 出战中标签 */
+.beast-card-deployed {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(46, 204, 113, 0.15));
+    border: 1px solid #ffd700;
+    color: #ffd700;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
 }

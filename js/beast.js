@@ -111,6 +111,13 @@ var Beast = {
             if (captured) {
                 html += '<div class="beast-card-level">Lv.' + captured.level +
                     (captured.star > 1 ? ' ★x' + captured.star : '') + '</div>';
+                // 出战中标签
+                if (Game.data.activeBeastIdx !== undefined && Game.data.activeBeastIdx >= 0) {
+                    var activeBeast = Game.data.capturedBeasts[Game.data.activeBeastIdx];
+                    if (activeBeast && activeBeast.id === captured.id) {
+                        html += '<div class="beast-card-deployed">出战中</div>';
+                    }
+                }
                 html += '<div class="beast-card-stats">' +
                     '<span class="bs-atk">攻' + captured.stats.atk + '</span>' +
                     '<span class="bs-hp">血' + captured.stats.hp + '</span>' +
@@ -638,9 +645,16 @@ var Beast = {
 
         html += '</div>';
 
-        // 出战按钮（占位）
+        // 出战/召回按钮
+        var isActiveBeast = (Game.data.activeBeastIdx !== undefined &&
+            Game.data.activeBeastIdx >= 0 &&
+            Game.data.activeBeastIdx < Game.data.capturedBeasts.length &&
+            Game.data.capturedBeasts[Game.data.activeBeastIdx].id === beast.id);
         html += '<div class="detail-battle-section">' +
-            '<button class="beast-btn beast-btn-battle disabled" disabled>出 战（即将开放）</button>' +
+            '<button class="beast-btn beast-btn-battle' + (isActiveBeast ? ' deployed' : '') +
+            '" id="btn-deploy-beast" style="' + (isActiveBeast ? 'background:linear-gradient(135deg,rgba(46,204,113,0.25),rgba(39,174,96,0.12));border-color:#2ecc71;color:#2ecc71;' : 'background:linear-gradient(135deg,rgba(212,165,116,0.2),rgba(184,134,11,0.1));border-color:#d4a574;color:#d4a574;') + '">' +
+            (isActiveBeast ? '出 战 中（点击召回）' : '出 战') +
+            '</button>' +
             '</div>';
 
         container.innerHTML = html;
@@ -687,6 +701,14 @@ var Beast = {
         if (evolveBtn) {
             evolveBtn.addEventListener('click', function () {
                 self.evolveBeast();
+            });
+        }
+
+        // 出战/召回按钮
+        var deployBtn = document.getElementById('btn-deploy-beast');
+        if (deployBtn) {
+            deployBtn.addEventListener('click', function () {
+                self.deployBeast();
             });
         }
     },
@@ -823,6 +845,17 @@ var Beast = {
         // 移除牺牲材料
         Game.data.capturedBeasts.splice(sacrificeIdx, 1);
 
+        // 修正 activeBeastIdx（如果移除的索引在出战索引之前或被移除的就是出战灵兽）
+        if (Game.data.activeBeastIdx !== undefined && Game.data.activeBeastIdx >= 0) {
+            if (Game.data.activeBeastIdx === sacrificeIdx) {
+                // 牺牲材料是出战灵兽 → 清除
+                Game.data.activeBeastIdx = -1;
+            } else if (Game.data.activeBeastIdx > sacrificeIdx) {
+                // 出战灵兽在牺牲材料之后 → 索引前移
+                Game.data.activeBeastIdx--;
+            }
+        }
+
         // 升星
         beast.star++;
 
@@ -845,6 +878,71 @@ var Beast = {
         Game.saveGame();
         this.renderBeastDetail(this._detailBeastId);
         showToast(beast.name + ' 进化为 ★x' + beast.star + '！');
+    },
+
+    /* =========================================================
+       出战系统（第11-4批）
+       ========================================================= */
+
+    /** 出战/召回灵兽 */
+    deployBeast: function () {
+        var detailBeast = this._findBeast(this._detailBeastId);
+        if (!detailBeast) return;
+
+        // 查找该灵兽在 capturedBeasts 中的索引
+        var beastIdx = -1;
+        for (var i = 0; i < Game.data.capturedBeasts.length; i++) {
+            if (Game.data.capturedBeasts[i].id === detailBeast.id) {
+                beastIdx = i;
+                break;
+            }
+        }
+        if (beastIdx === -1) return;
+
+        // 如果当前正好是该灵兽出战 → 召回
+        if (Game.data.activeBeastIdx === beastIdx) {
+            Game.data.activeBeastIdx = -1;
+            Game.saveGame();
+            this.renderBeastDetail(this._detailBeastId);
+            showToast(detailBeast.name + ' 已召回');
+            return;
+        }
+
+        // 出战：设置 activeBeastIdx
+        Game.data.activeBeastIdx = beastIdx;
+        Game.saveGame();
+        this.renderBeastDetail(this._detailBeastId);
+        showToast(detailBeast.name + ' 已出战！');
+    },
+
+    /** 获取出战灵兽的属性加成（加成比例 = star × 5%） */
+    getActiveBeastBonus: function () {
+        var idx = Game.data.activeBeastIdx;
+        if (idx === undefined || idx < 0 || idx >= Game.data.capturedBeasts.length) {
+            return { atk: 0, hp: 0, def: 0, critRate: 0 };
+        }
+
+        var beast = Game.data.capturedBeasts[idx];
+        var ratio = beast.star * 0.05; // 每星5%
+
+        var bonus = {
+            atk: Math.floor(beast.stats.atk * ratio),
+            hp: Math.floor(beast.stats.hp * ratio),
+            def: Math.floor(beast.stats.def * ratio),
+            critRate: Math.floor(beast.stats.critRate * ratio)
+        };
+
+        // 满级满星额外加成（属性 ×10% 额外）
+        var maxLv = this.getMaxLevel(beast);
+        var maxStar = this.getMaxStar(beast.quality);
+        if (beast.level >= maxLv && beast.star >= maxStar) {
+            bonus.atk += Math.floor(beast.stats.atk * 0.1);
+            bonus.hp += Math.floor(beast.stats.hp * 0.1);
+            bonus.def += Math.floor(beast.stats.def * 0.1);
+            bonus.critRate += Math.floor(beast.stats.critRate * 0.1);
+        }
+
+        return bonus;
     },
 
 };
