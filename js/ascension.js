@@ -33,7 +33,7 @@ var Ascension = {
        检查是否满足飞升条件
        ---------------------------------------------------------- */
     canAscend: function () {
-        if (!Cultivation.isMaxRealm()) return false;
+        if (!Cultivation.isAscensionThreshold()) return false;
         if (!Cultivation.isExpFull()) return false;
         if (Game.data.spiritStones < 100000) return false;
         if (this.inTribulation) return false;
@@ -45,8 +45,8 @@ var Ascension = {
        ---------------------------------------------------------- */
     startAscension: function () {
         if (!this.canAscend()) {
-            if (!Cultivation.isMaxRealm()) {
-                showToast('尚未达到最高境界！', 2000);
+            if (!Cultivation.isAscensionThreshold()) {
+                showToast('需修炼至渡劫·十层方可渡劫飞升！', 2000);
             } else if (!Cultivation.isExpFull()) {
                 showToast('经验尚未圆满，无法渡劫！', 2000);
             } else if (Game.data.spiritStones < 100000) {
@@ -759,8 +759,8 @@ var Ascension = {
                 html += '<div style="text-align:center;padding:16px;' +
                     'background:rgba(15,52,96,0.3);border:1px solid rgba(184,134,11,0.15);' +
                     'border-radius:10px;font-size:13px;color:var(--text-secondary);line-height:1.8;">';
-                if (!Cultivation.isMaxRealm()) {
-                    html += '需先修炼至最高境界方可渡劫飞升';
+                if (!Cultivation.isAscensionThreshold()) {
+                    html += '需修炼至渡劫·十层方可渡劫飞升';
                 } else if (!Cultivation.isExpFull()) {
                     html += '境界已达巅峰，但经验尚未圆满';
                 } else if (Game.data.spiritStones < 100000) {

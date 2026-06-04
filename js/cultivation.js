@@ -93,9 +93,14 @@ var Cultivation = {
         return getRealmDisplayName(Game.data.realmIndex, Game.data.layer);
     },
 
-    /** 检查是否已达最高境界 */
+    /** 检查是否已达凡人修炼终点（渡劫·十层，需飞升） */
     isMaxRealm: function () {
         return isMaxRealm(Game.data.realmIndex, Game.data.layer);
+    },
+
+    /** 检查是否到达飞升门槛（渡劫·十层） */
+    isAscensionThreshold: function () {
+        return Game.data.realmIndex >= REALMS.length - 2 && Game.data.layer >= 9;
     },
 
     /** 检查经验是否已满 */
@@ -162,6 +167,11 @@ var Cultivation = {
 
     breakthrough: function () {
         if (!this.isExpFull()) return;
+        if (this.isAscensionThreshold()) {
+            showToast('渡劫圆满！请前往飞升界面引动天劫。', 3000);
+            Game.switchTab('ascend');
+            return;
+        }
         if (this.isMaxRealm()) {
             showToast('道友已臻至最高境界——真仙·十层！再无可破之境。', 3000);
             return;
@@ -243,14 +253,15 @@ var Cultivation = {
         var btn = Game.dom.cultivateBtn;
         var label = Game.dom.cultivateBtnLabel;
 
-        // 满境界+经验满 → 渡劫飞升
-        if (this.isMaxRealm() && this.isExpFull()) {
+        // 飞升门槛（渡劫圆满） + 经验满 → 渡劫飞升
+        if (this.isAscensionThreshold() && this.isExpFull()) {
             btn.classList.add('breakthrough');
             btn.disabled = false;
             label.textContent = '渡劫飞升';
             return;
         }
 
+        // 真仙·十层 → 圆满
         if (this.isMaxRealm()) {
             btn.classList.remove('breakthrough');
             btn.disabled = true;

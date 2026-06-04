@@ -355,12 +355,12 @@ var Skills = {
 
         // 通用技能
         var commonSkills = this.getUnlockedCommonSkills();
-        html += this._renderSkillGroup('通用技能', commonSkills, equipped, 'gold');
+        html += this._renderSkillGroup('通用技能', commonSkills, equipped, 'gold', slotCount);
 
         // 宗门技能
         var sectSkills = this.getUnlockedSectSkills();
         if (sectSkills.length > 0) {
-            html += this._renderSkillGroup('宗门技能', sectSkills, equipped, 'purple');
+            html += this._renderSkillGroup('宗门技能', sectSkills, equipped, 'purple', slotCount);
         }
 
         container.innerHTML = html;
@@ -369,8 +369,13 @@ var Skills = {
     /* ----------------------------------------------------------
        渲染技能分组
        ---------------------------------------------------------- */
-    _renderSkillGroup: function (title, skills, equipped, colorClass) {
+    _renderSkillGroup: function (title, skills, equipped, colorClass, slotCount) {
         if (skills.length === 0) return '';
+        // 找第一个空槽位
+        var emptySlot = 0;
+        for (var si = 0; si < slotCount; si++) {
+            if (!equipped[si]) { emptySlot = si; break; }
+        }
         var html = '';
         html += '<div class="skills-section-title skills-section-' + colorClass + '">' + title + ' <span class="skills-count">' + skills.length + '个</span></div>';
         html += '<div class="skills-list">';
@@ -404,7 +409,7 @@ var Skills = {
                 html += '<span class="skill-max-tag">MAX</span>';
             }
             if (!isEquipped) {
-                html += '<button class="skill-equip-btn" onclick="event.stopPropagation();Skills.equipSkill(\'' + sk.id + '\',' + (equipped.indexOf(null) >= 0 ? equipped.indexOf(null) : 0) + ');Skills.render();">装备</button>';
+                html += '<button class="skill-equip-btn" onclick="event.stopPropagation();Skills.equipSkill(\'' + sk.id + '\',' + emptySlot + ');Skills.render();">装备</button>';
             } else {
                 html += '<span class="skill-equipped-tag">已装备</span>';
             }
