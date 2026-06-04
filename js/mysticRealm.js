@@ -20,20 +20,38 @@ var MysticRealm = (function () {
     };
 
     /* ===========================================
-       境界基数表（realm 0~9）
+       境界基数表 — 已废弃，改为基于玩家有效属性动态计算
        =========================================== */
-    var REALM_BASE = [
-        { atk: 10,   def: 5,    hp: 100 },
-        { atk: 25,   def: 12,   hp: 250 },
-        { atk: 60,   def: 30,   hp: 600 },
-        { atk: 140,  def: 70,   hp: 1400 },
-        { atk: 320,  def: 160,  hp: 3200 },
-        { atk: 720,  def: 360,  hp: 7200 },
-        { atk: 1600, def: 800,  hp: 16000 },
-        { atk: 3500, def: 1750, hp: 35000 },
-        { atk: 7500, def: 3750, hp: 75000 },
-        { atk: 16000,def: 8000, hp: 160000 },
-    ];
+    // var REALM_BASE = [ ... ]; — see getRealmEnemyStats() below
+
+    /* ===========================================
+       固定数值敌人属性（传奇风格，基于玩家当前境界缩放）
+       realmIndex: 玩家当前境界索引（0-9），由此计算境界系数
+       layerWithinRealm: 层内难度 0=简单 1=普通 2=困难
+       =========================================== */
+    function getRealmEnemyStats(realmIndex, layerWithinRealm) {
+        // 基础属性（境界0·简单难度，与凡人期满层玩家等比校准）
+        var baseHp = 600;
+        var baseAtk = 250;
+        var baseDef = 250;
+
+        // 境界系数：每个境界翻倍（指数增长，realmIndex=0 → mult=1）
+        var realmMult = Math.pow(2, realmIndex);
+
+        // 层内难度系数：简单/普通/困难
+        var hpMult  = [1.0, 1.5, 2.2];
+        var atkMult = [1.0, 1.4, 1.8];
+        var defMult = [1.0, 1.3, 1.6];
+
+        // 随机波动 ±5%
+        var rnd = 0.95 + Math.random() * 0.1;
+
+        return {
+            hp:  Math.floor(baseHp  * realmMult * hpMult[layerWithinRealm]  * rnd),
+            atk: Math.floor(baseAtk * realmMult * atkMult[layerWithinRealm] * rnd),
+            def: Math.floor(baseDef * realmMult * defMult[layerWithinRealm] * rnd)
+        };
+    }
 
     /* ===========================================
        秘境类型定义（4个常规 + 无尽试炼）
@@ -388,8 +406,7 @@ var MysticRealm = (function () {
             var difficulty = getLayerDifficulty(layer);
             var diffName = getDifficultyName(layer);
             var diffColor = difficulty === 0 ? '#4ade80' : difficulty === 1 ? '#fbbf24' : '#f87171';
-            var canEnter = cleared || (layer === 0);
-            if (layer > 0 && !isLayerCleared(realmId, layer - 1)) canEnter = false;
+            var canEnter = cleared || (layer === 0) || (layer > 0 && isLayerCleared(realmId, layer - 1));
 
             var realmIndexOfLayer = Math.floor(layer / CONFIG.layersPerRealmIndex);
             var layerInRealm = (layer % CONFIG.layersPerRealmIndex) + 1;
@@ -600,23 +617,11 @@ var MysticRealm = (function () {
     }
 
     /* ===========================================
-       生成层敌人（新：境界基数 + 层内倍率）
+       生成层敌人（动态：基于玩家有效属性）
        =========================================== */
     function getLayerEnemies(realm, layer) {
-        // 该层所属境界（每3层一个境界）
-        var realmIdx = Math.min(Math.floor(layer / CONFIG.layersPerRealmIndex), REALM_BASE.length - 1);
         var layerInRealm = layer % CONFIG.layersPerRealmIndex;   // 0=简单,1=普通,2=困难
-
-        // 层内倍率
-        var layerMult = layerInRealm === 0 ? 0.8 : layerInRealm === 1 ? 1.0 : 1.3;
-
-        // 前10层小幅度递增因子
-        var incFactor = 1 + layer * 0.05;
-
-        var base = REALM_BASE[realmIdx];
-        var baseAtk = Math.floor(base.atk * layerMult * incFactor);
-        var baseDef = Math.floor(base.def * layerMult * incFactor);
-        var baseHp  = Math.floor(base.hp  * layerMult * incFactor);
+        var stats = getRealmEnemyStats(Game.data.realmIndex, layerInRealm);
 
         var enemies = [];
         for (var i = 0; i < realm.enemies.length; i++) {
@@ -625,12 +630,12 @@ var MysticRealm = (function () {
             var rnd = 0.95 + Math.random() * 0.1;
             enemies.push({
                 name: eBase.name + ' Lv.' + (layer + 1),
-                hp:    Math.floor(baseHp  * rnd),
-                maxHp: Math.floor(baseHp  * rnd),
-                atk:   Math.floor(baseAtk * rnd),
-                def:   Math.floor(baseDef * rnd),
+                hp:    Math.floor(stats.hp  * rnd),
+                maxHp: Math.floor(stats.hp  * rnd),
+                atk:   Math.floor(stats.atk * rnd),
+                def:   Math.floor(stats.def * rnd),
                 dropMultiplier: (eBase.dropM || 1.0),
-                xpBonus: Math.floor(10 * layerMult * incFactor),
+                xpBonus: Math.floor(10 * ([0.8, 1.0, 1.3][layerInRealm])),
             });
         }
         return enemies;
@@ -654,7 +659,7 @@ var MysticRealm = (function () {
     }
 
     /* ===========================================
-       战斗UI
+       战斗UI — 挂机战斗风格
        =========================================== */
     function showBattleUI(realm, waveIdx, enemyData, totalWaves) {
         var container = document.getElementById('realm-content');
@@ -662,34 +667,114 @@ var MysticRealm = (function () {
 
         var diffName = getDifficultyName(state.currentLayer);
 
-        var html = '';
-        html += '<div style="text-align:center;margin-bottom:10px;">';
-        html += '<div style="font-size:16px;color:' + realm.color + ';font-weight:bold;">' + realm.icon + ' ' + realm.name + '</div>';
-        html += '<div style="color:#ccc;font-size:12px;">第 ' + (state.currentLayer + 1) + ' 层（' + diffName + '） · 第 ' + (waveIdx + 1) + '/' + totalWaves + ' 波</div>';
-        html += '</div>';
+        // Calculate player display max HP
+        var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { hpPct: 0 };
+        var activeBuffs = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { hpPct: 0 };
+        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { hpPct: 0 };
+        var skillAllBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_all') : 0;
+        var totalHpPct = sectBonus.hpPct + activeBuffs.hpPct + talentEff.hpPct + skillAllBuff;
+        var pDisplayMaxHp = Math.floor((Game.data.hp || 100) * (1 + totalHpPct / 100));
 
-        html += '<div style="background:#1a1a2e;border:1px solid ' + realm.color + '55;border-radius:8px;padding:12px;text-align:center;margin-bottom:12px;">';
-        html += '<div style="color:' + realm.color + ';font-size:14px;font-weight:bold;margin-bottom:6px;">' + enemyData.name + '</div>';
-        html += '<div style="margin-bottom:6px;">';
-        html += '<div style="background:#333;border-radius:4px;height:8px;overflow:hidden;">';
-        html += '<div id="realm-enemy-hp-bar" style="background:' + realm.color + ';height:100%;width:100%;transition:width 0.3s;"></div>';
-        html += '</div>';
-        html += '<div style="color:#aaa;font-size:11px;margin-top:2px;">HP ' + enemyData.hp + '/' + enemyData.maxHp + '</div>';
-        html += '</div>';
-        html += '<div style="display:flex;justify-content:center;gap:20px;color:#999;font-size:11px;">';
-        html += '<span>攻击 ' + enemyData.atk + '</span><span>防御 ' + enemyData.def + '</span>';
-        html += '</div></div>';
+        // Store enemy data in state
+        state._enemyData = enemyData;
+        state._autoBattle = false;
 
-        html += '<div style="display:flex;gap:8px;justify-content:center;">';
-        html += '<button class="btn" onclick="MysticRealm.doAttack()" style="background:' + realm.color + ';color:#fff;border:none;border-radius:6px;padding:8px 20px;">攻击</button>';
-        html += '<button class="btn" onclick="MysticRealm.fleeRealm()" style="background:#555;color:#fff;border:none;border-radius:6px;padding:8px 20px;">撤退</button>';
-        html += '</div>';
+        container.innerHTML = '';
 
-        html += '<div id="realm-battle-log" style="margin-top:10px;max-height:120px;overflow-y:auto;color:#aaa;font-size:11px;"></div>';
+        // Zone info header
+        var zoneDiv = el('div', { style: 'text-align:center;margin-bottom:10px;' });
+        zoneDiv.innerHTML = '<div style="font-size:16px;color:' + realm.color + ';font-weight:bold;">' + realm.icon + ' ' + realm.name + '</div>' +
+            '<div style="color:#ccc;font-size:12px;">第 ' + (state.currentLayer + 1) + ' 层（' + diffName + '） · 第 ' + (waveIdx + 1) + '/' + totalWaves + ' 波</div>';
+        container.appendChild(zoneDiv);
 
-        container.innerHTML = html;
-        container.setAttribute('data-enemy', JSON.stringify(enemyData));
-        container.setAttribute('data-endless', '0');
+        // Monster info
+        var monsterDiv = el('div', { id: 'realm-monster-info', style: 'margin-bottom:8px;' });
+        monsterDiv.appendChild(el('div', { style: 'font-size:13px;color:#e74c3c;font-weight:bold;margin-bottom:4px;', textContent: enemyData.name }));
+        var mBar = createProgressBar(enemyData.hp, enemyData.maxHp,
+            'linear-gradient(90deg,#c0392b,#e74c3c)',
+            formatNumber(enemyData.hp) + ' / ' + formatNumber(enemyData.maxHp));
+        mBar.id = 'realm-enemy-hp-bar';
+        monsterDiv.appendChild(mBar);
+        monsterDiv.appendChild(el('div', {
+            style: 'display:flex;gap:16px;color:#999;font-size:11px;margin-top:2px;',
+            innerHTML: '<span>攻击 ' + enemyData.atk + '</span><span>防御 ' + enemyData.def + '</span>'
+        }));
+        container.appendChild(monsterDiv);
+
+        // Player bar
+        var playerDiv = el('div', { id: 'realm-player-bar', style: 'margin-bottom:8px;' });
+        playerDiv.appendChild(el('div', { style: 'font-size:12px;color:#2ecc71;margin-bottom:3px;', textContent: '角色生命' }));
+        var pBar = createProgressBar(Game.data.hp, pDisplayMaxHp,
+            'linear-gradient(90deg,#1e8449,#2ecc71)',
+            formatNumber(Game.data.hp) + ' / ' + formatNumber(pDisplayMaxHp));
+        pBar.id = 'realm-player-hp-bar';
+        playerDiv.appendChild(pBar);
+        container.appendChild(playerDiv);
+
+        // Battle log
+        var logDiv = el('div', {
+            id: 'realm-battle-log',
+            style: 'max-height:100px;overflow-y:auto;color:#aaa;font-size:11px;margin-bottom:8px;padding:6px;background:rgba(0,0,0,0.2);border-radius:4px;'
+        });
+        container.appendChild(logDiv);
+
+        // Buttons
+        var btnRow = el('div', { style: 'display:flex;gap:8px;' });
+        btnRow.appendChild(el('button', {
+            id: 'realm-auto-btn', className: 'btn', textContent: '⚡ 自动', onclick: 'MysticRealm.toggleAutoBattle()',
+            style: 'background:#555;color:#ccc;border:none;border-radius:6px;padding:8px 14px;font-size:12px;'
+        }));
+        btnRow.appendChild(el('button', {
+            className: 'btn', textContent: '攻击', onclick: 'MysticRealm.doAttack()',
+            style: 'background:' + realm.color + ';color:#fff;border:none;border-radius:6px;padding:8px 20px;'
+        }));
+        btnRow.appendChild(el('button', {
+            className: 'btn', textContent: '撤退', onclick: 'MysticRealm.fleeRealm()',
+            style: 'background:#555;color:#fff;border:none;border-radius:6px;padding:8px 20px;'
+        }));
+        container.appendChild(btnRow);
+    }
+
+    /* ===========================================
+       DOM helper
+       =========================================== */
+    function el(tag, attrs) {
+        var e = document.createElement(tag);
+        for (var k in attrs) {
+            if (k === 'style') e.style.cssText = attrs[k];
+            else if (k === 'innerHTML') e.innerHTML = attrs[k];
+            else if (k === 'textContent') e.textContent = attrs[k];
+            else if (k === 'onclick') e.setAttribute('onclick', attrs[k]);
+            else if (k === 'className') e.className = attrs[k];
+            else if (k === 'id') e.id = attrs[k];
+            else e.setAttribute(k, attrs[k]);
+        }
+        return e;
+    }
+
+    /* ===========================================
+       自动战斗切换
+       =========================================== */
+    function toggleAutoBattle() {
+        state._autoBattle = !state._autoBattle;
+        var btn = document.getElementById('realm-auto-btn');
+        if (btn) {
+            btn.textContent = state._autoBattle ? '⏸ 停止' : '⚡ 自动';
+            btn.style.background = state._autoBattle ? '#d4a017' : '#555';
+            btn.style.color = state._autoBattle ? '#000' : '#ccc';
+        }
+        if (state._autoBattle) {
+            doAttack();
+        } else {
+            clearAutoBattleTimer();
+        }
+    }
+
+    function clearAutoBattleTimer() {
+        if (state._autoTimer) {
+            clearTimeout(state._autoTimer);
+            state._autoTimer = null;
+        }
     }
 
     /* ===========================================
@@ -697,17 +782,12 @@ var MysticRealm = (function () {
        =========================================== */
     function doAttack() {
         if (!state.inBattle || !Game) return;
+        if (!state._enemyData) return;
 
-        var container = document.getElementById('realm-content');
-        if (!container) return;
+        var enemyData = state._enemyData;
+        var isEndless = state.isEndless;
 
-        var enemyStr = container.getAttribute('data-enemy');
-        if (!enemyStr) return;
-        var enemyData = JSON.parse(enemyStr);
-
-        var isEndless = container.getAttribute('data-endless') === '1';
-
-        // 攻击/防御/生命加成计算
+        // 攻击/防御/生命加成计算（与挂机战斗同源）
         var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { atkPct: 0, defPct: 0, hpPct: 0 };
         var activeBuffs = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0, hpPct: 0 };
         var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { atkPct: 0, defPct: 0, hpPct: 0, critRate: 0 };
@@ -729,8 +809,7 @@ var MysticRealm = (function () {
 
         var pAtk = Math.floor((Game.data.attack || 10) * (1 + totalAtkPct / 100));
         var pDef = Math.floor((Game.data.defense || 5) * (1 + totalDefPct / 100));
-        var pHp = Game.data.hp || 100;
-        var pMaxHp = Game.data.maxHp || 100;
+        var pMaxHp = Math.floor((Game.data.hp || 100) * (1 + totalHpPct / 100));
 
         if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
             var beastBonus = Beast.getActiveBeastBonus();
@@ -755,7 +834,6 @@ var MysticRealm = (function () {
             }
         }
         if (typeof Talents !== 'undefined') totalCritRate += Talents.getEffects().critRate / 100;
-        // 灵兽暴击率加成
         if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
             var beastCritRate = Beast.getActiveBeastBonus().critRate || 0;
             if (beastCritRate > 0) totalCritRate += beastCritRate / 100;
@@ -773,44 +851,31 @@ var MysticRealm = (function () {
         if (crit) log += '<span style="color:#fbbf24;">暴击！</span>';
         log += '你攻击 ' + enemyData.name + ' 造成 <span style="color:#f87171;">' + pDmg + '</span> 点伤害</div>';
 
-        var hpBar = document.getElementById('realm-enemy-hp-bar');
-        if (hpBar) {
-            var pct = Math.max(0, enemyData.hp / enemyData.maxHp * 100);
-            hpBar.style.width = pct + '%';
-            hpBar.parentElement.nextElementSibling.textContent = 'HP ' + Math.max(0, enemyData.hp) + '/' + enemyData.maxHp;
-        }
+        // 更新敌人HP条
+        updateRealmEnemyBar();
 
         // 检查敌人死亡
         if (enemyData.hp <= 0) {
             enemyData.hp = 0;
             log += '<div style="color:#4ade80;">击败了 ' + enemyData.name + '！</div>';
-            if (logEl) {
-                logEl.innerHTML += log;
-                logEl.scrollTop = logEl.scrollHeight;
-            }
+            if (logEl) { logEl.innerHTML += log; logEl.scrollTop = logEl.scrollHeight; }
+            clearAutoBattleTimer();
 
             if (isEndless) {
-                // 无尽试炼：奖励 + 下一波
                 giveEndlessWaveReward(state.endlessWave, enemyData.isBoss, enemyData.isSuperBoss);
-                Game.data.hp = Math.min(Game.data.hp + Math.floor(pMaxHp * (enemyData.isSuperBoss ? 0.5 : enemyData.isBoss ? 0.35 : 0.2)), pMaxHp);
-                if (state.endlessWave > (Game.data.endlessTrialMaxLayer || 0)) {
-                    Game.data.endlessTrialMaxLayer = state.endlessWave;
-                }
+                Game.data.hp = Math.min(pMaxHp, Game.data.hp + Math.floor(pMaxHp * (enemyData.isSuperBoss ? 0.5 : enemyData.isBoss ? 0.35 : 0.2)));
+                if (state.endlessWave > (Game.data.endlessTrialMaxLayer || 0)) Game.data.endlessTrialMaxLayer = state.endlessWave;
                 state.endlessWave++;
-                setTimeout(function () {
-                    startEndlessWave();
-                }, 800);
+                setTimeout(function () { startEndlessWave(); }, 800);
             } else {
-                // 常规秘境
                 giveWaveReward(enemyData);
-                Game.data.hp = Math.min(Game.data.hp + Math.floor(pMaxHp * 0.2), pMaxHp);
+                var healPct = 0.35 - Game.data.realmIndex * 0.015;   // 35%→21.5% 梯度回血
+                Game.data.hp = Math.min(pMaxHp, Game.data.hp + Math.floor(pMaxHp * healPct));
                 state.currentWave++;
                 if (state.currentWave >= getLayerEnemies(state.currentRealm, state.currentLayer).length) {
                     onLayerCleared();
                 } else {
-                    setTimeout(function () {
-                        startWave();
-                    }, 800);
+                    setTimeout(function () { startWave(); }, 800);
                 }
             }
             return;
@@ -818,41 +883,71 @@ var MysticRealm = (function () {
 
         // 敌人反击
         var eDmg = Math.max(1, enemyData.atk - pDef * 0.4 + Math.floor(Math.random() * 4));
-
-        // 技能护盾吸收
         if (Game.data.skillShield && Game.data.skillShield > 0) {
             var absorbed = Math.min(Game.data.skillShield, eDmg);
             Game.data.skillShield -= absorbed;
             eDmg -= absorbed;
-            if (absorbed > 0) {
-                log += '<div style="color:#38bdf8;">护盾吸收 ' + absorbed + ' 点伤害</div>';
-            }
+            if (absorbed > 0) log += '<div style="color:#38bdf8;">护盾吸收 ' + absorbed + ' 点伤害</div>';
         }
 
         Game.data.hp = Math.max(0, Game.data.hp - eDmg);
-
         log += '<div>' + enemyData.name + ' 反击造成 <span style="color:#f87171;">' + eDmg + '</span> 点伤害</div>';
+
+        // 更新玩家HP条
+        updateRealmPlayerBar();
 
         if (Game.data.hp <= 0) {
             log += '<div style="color:#f87171;">你被击败了！</div>';
-            if (logEl) {
-                logEl.innerHTML += log;
-                logEl.scrollTop = logEl.scrollHeight;
-            }
-            if (isEndless) {
-                onEndlessDeath();
-            } else {
-                onRealmFailed();
-            }
+            if (logEl) { logEl.innerHTML += log; logEl.scrollTop = logEl.scrollHeight; }
+            clearAutoBattleTimer();
+            if (isEndless) { onEndlessDeath(); } else { onRealmFailed(); }
             return;
         }
 
-        if (logEl) {
-            logEl.innerHTML += log;
-            logEl.scrollTop = logEl.scrollHeight;
-        }
+        if (logEl) { logEl.innerHTML += log; logEl.scrollTop = logEl.scrollHeight; }
 
-        container.setAttribute('data-enemy', JSON.stringify(enemyData));
+        // Auto-battle: schedule next attack
+        if (state._autoBattle) {
+            state._autoTimer = setTimeout(function () { doAttack(); }, 1500);
+        }
+    }
+
+    /* ===========================================
+       更新敌人HP血条
+       =========================================== */
+    function updateRealmEnemyBar() {
+        var bar = document.getElementById('realm-enemy-hp-bar');
+        if (!bar || !state._enemyData) return;
+        var fill = bar.querySelector('div');
+        if (fill) {
+            fill.style.width = Math.max(0, (state._enemyData.hp / state._enemyData.maxHp) * 100) + '%';
+        }
+        var label = bar.querySelectorAll('div')[1];
+        if (label) {
+            label.textContent = formatNumber(Math.max(0, state._enemyData.hp)) + ' / ' + formatNumber(state._enemyData.maxHp);
+        }
+    }
+
+    /* ===========================================
+       更新玩家HP血条
+       =========================================== */
+    function updateRealmPlayerBar() {
+        var bar = document.getElementById('realm-player-hp-bar');
+        if (!bar) return;
+        var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { hpPct: 0 };
+        var activeBuffs = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { hpPct: 0 };
+        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { hpPct: 0 };
+        var skillAllBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_all') : 0;
+        var totalHpPct = sectBonus.hpPct + activeBuffs.hpPct + talentEff.hpPct + skillAllBuff;
+        var pDisplayMaxHp = Math.floor((Game.data.hp || 100) * (1 + totalHpPct / 100));
+        var fill = bar.querySelector('div');
+        if (fill) {
+            fill.style.width = Math.max(0, (Game.data.hp / pDisplayMaxHp) * 100) + '%';
+        }
+        var label = bar.querySelectorAll('div')[1];
+        if (label) {
+            label.textContent = formatNumber(Game.data.hp) + ' / ' + formatNumber(pDisplayMaxHp);
+        }
     }
 
     /* ===========================================
@@ -868,7 +963,8 @@ var MysticRealm = (function () {
         switch (realm.lootType) {
             case 'spiritStones':
                 var range = realm.lootRange;
-                var stones = Math.floor((range[0] + Math.random() * (range[1] - range[0])) * mul);
+                var realmScale = 1 + Game.data.realmIndex * 0.3;
+                var stones = Math.floor((range[0] + Math.random() * (range[1] - range[0])) * mul * realmScale);
                 Game.addSpirit(stones);
                 break;
             case 'equipment':
@@ -896,8 +992,9 @@ var MysticRealm = (function () {
                 break;
         }
 
-        var baseStones = Math.floor((5 + Math.random() * 15) * mul);
-        var baseExp = Math.floor((10 + Math.random() * 30) * mul);
+        var realmScale = 1 + Game.data.realmIndex * 0.3;
+        var baseStones = Math.floor((5 + Math.random() * 15) * mul * realmScale);
+        var baseExp = Math.floor((10 + Math.random() * 30) * mul * (1 + Game.data.realmIndex * 0.25));
         Game.addSpirit(baseStones);
         Game.addExperience(baseExp);
     }
@@ -1139,6 +1236,8 @@ var MysticRealm = (function () {
        撤退
        =========================================== */
     function fleeRealm() {
+        clearAutoBattleTimer();
+        state._enemyData = null;
         state.inBattle = false;
         state.isEndless = false;
         saveState();
@@ -1172,16 +1271,21 @@ var MysticRealm = (function () {
     }
 
     /* ===========================================
-       无尽试炼：开始一波（新数值）
+       无尽试炼：开始一波（固定数值，传奇风格递增）
        =========================================== */
     function startEndlessWave() {
         var waveNum = state.endlessWave;
         var isBoss = (waveNum % 5 === 0);
         var isSuperBoss = (waveNum % 10 === 0);
 
-        // 第1层从 realm 0 基数开始，每层 ×1.08
+        // 固定基础值 + 每波递增8%
+        var baseHp = 1000;
+        var baseAtk = 100;
+        var baseDef = 40;
         var baseScale = Math.pow(1.08, waveNum - 1);
-        var enemyBase = ENDLESS_CONFIG.enemyBase;
+        var waveHp = Math.floor(baseHp * baseScale);
+        var waveAtk = Math.floor(baseAtk * baseScale);
+        var waveDef = Math.floor(baseDef * baseScale);
 
         var enemyData = {
             name: '',
@@ -1195,26 +1299,24 @@ var MysticRealm = (function () {
         };
 
         if (isSuperBoss) {
-            var sMult = ENDLESS_CONFIG.superBossMultiplier;  // 3.5
             enemyData.name = '深渊之主 · 第' + waveNum + '层';
-            enemyData.hp    = Math.floor(enemyBase.hp  * baseScale * sMult);
+            enemyData.hp    = Math.floor(waveHp * 3.5);
             enemyData.maxHp = enemyData.hp;
-            enemyData.atk   = Math.floor(enemyBase.atk * baseScale * sMult);
-            enemyData.def   = Math.floor(enemyBase.def * baseScale * sMult);
+            enemyData.atk   = Math.floor(waveAtk * 3.5);
+            enemyData.def   = Math.floor(waveDef * 3.5);
         } else if (isBoss) {
-            var bMult = ENDLESS_CONFIG.bossMultiplier;  // 2.0
             enemyData.name = '深渊守卫 · 第' + waveNum + '层';
-            enemyData.hp    = Math.floor(enemyBase.hp  * baseScale * bMult);
+            enemyData.hp    = Math.floor(waveHp * 2.0);
             enemyData.maxHp = enemyData.hp;
-            enemyData.atk   = Math.floor(enemyBase.atk * baseScale * bMult);
-            enemyData.def   = Math.floor(enemyBase.def * baseScale * bMult);
+            enemyData.atk   = Math.floor(waveAtk * 2.0);
+            enemyData.def   = Math.floor(waveDef * 2.0);
         } else {
             var names = ['深渊游魂', '暗影魔兵', '虚空行者', '炼狱之牙', '混沌仆从', '深渊爪牙', '裂隙鬼卒'];
             enemyData.name = names[waveNum % names.length] + ' · 第' + waveNum + '层';
-            enemyData.hp    = Math.floor(enemyBase.hp  * baseScale);
+            enemyData.hp    = waveHp;
             enemyData.maxHp = enemyData.hp;
-            enemyData.atk   = Math.floor(enemyBase.atk * baseScale);
-            enemyData.def   = Math.floor(enemyBase.def * baseScale);
+            enemyData.atk   = waveAtk;
+            enemyData.def   = waveDef;
         }
 
         state.endlessEnemy = enemyData;
@@ -1222,7 +1324,7 @@ var MysticRealm = (function () {
     }
 
     /* ===========================================
-       无尽试炼战斗UI
+       无尽试炼战斗UI — 挂机战斗风格
        =========================================== */
     function showEndlessBattleUI(enemyData) {
         var container = document.getElementById('realm-content');
@@ -1231,42 +1333,81 @@ var MysticRealm = (function () {
         var waveNum = enemyData.waveNum;
         var borderColor = enemyData.isSuperBoss ? '#c084fc' : enemyData.isBoss ? '#ffd700' : ENDLESS_CONFIG.borderColor;
         var titleColor = enemyData.isSuperBoss ? '#c084fc' : enemyData.isBoss ? '#ffd700' : '#f87171';
+        var barColor = enemyData.isSuperBoss ? 'linear-gradient(90deg,#6b21a8,#c084fc)' :
+                       enemyData.isBoss ? 'linear-gradient(90deg,#b8860b,#ffd700)' :
+                       'linear-gradient(90deg,#c0392b,#e74c3c)';
 
-        var html = '';
-        html += '<div style="background:linear-gradient(180deg,#0a0800,#1a1000,#0a0800);border:2px solid ' + borderColor + ';border-radius:10px;padding:16px;box-shadow:0 0 20px rgba(212,160,23,0.15);">';
+        // Store enemy data
+        state._enemyData = enemyData;
+        state._autoBattle = false;
 
-        html += '<div style="text-align:center;margin-bottom:10px;">';
-        html += '<div style="color:#ffd700;font-size:16px;font-weight:bold;">' + ENDLESS_CONFIG.icon + ' 无尽试炼 · 第' + waveNum + '层</div>';
+        var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { hpPct: 0 };
+        var activeBuffs = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { hpPct: 0 };
+        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { hpPct: 0 };
+        var skillAllBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_all') : 0;
+        var totalHpPct = sectBonus.hpPct + activeBuffs.hpPct + talentEff.hpPct + skillAllBuff;
+        var pDisplayMaxHp = Math.floor((Game.data.hp || 100) * (1 + totalHpPct / 100));
+
+        container.innerHTML = '';
+
+        // Wrapper with dark theme
+        var wrapper = el('div', { style: 'background:linear-gradient(180deg,#0a0800,#1a1000,#0a0800);border:2px solid ' + borderColor + ';border-radius:10px;padding:16px;box-shadow:0 0 20px rgba(212,160,23,0.15);' });
+
+        // Header
+        var header = el('div', { style: 'text-align:center;margin-bottom:10px;' });
+        header.innerHTML = '<div style="color:#ffd700;font-size:16px;font-weight:bold;">' + ENDLESS_CONFIG.icon + ' 无尽试炼 · 第' + waveNum + '层</div>';
         if (enemyData.isSuperBoss) {
-            html += '<div style="color:#c084fc;font-size:12px;margin-top:2px;">⚡ 大BOSS · 属性大幅跃升 ⚡</div>';
+            header.innerHTML += '<div style="color:#c084fc;font-size:12px;margin-top:2px;">⚡ 大BOSS · 属性大幅跃升 ⚡</div>';
         } else if (enemyData.isBoss) {
-            html += '<div style="color:#ffd700;font-size:12px;margin-top:2px;">👑 BOSS 战</div>';
+            header.innerHTML += '<div style="color:#ffd700;font-size:12px;margin-top:2px;">👑 BOSS 战</div>';
         }
-        html += '</div>';
+        wrapper.appendChild(header);
 
-        html += '<div style="background:#111;border:1px solid ' + borderColor + '55;border-radius:8px;padding:12px;text-align:center;margin-bottom:12px;">';
-        html += '<div style="color:' + titleColor + ';font-size:14px;font-weight:bold;margin-bottom:6px;">' + enemyData.name + '</div>';
-        html += '<div style="margin-bottom:6px;">';
-        html += '<div style="background:#222;border-radius:4px;height:8px;overflow:hidden;">';
-        html += '<div id="realm-enemy-hp-bar" style="background:' + titleColor + ';height:100%;width:100%;transition:width 0.3s;"></div>';
-        html += '</div>';
-        html += '<div style="color:#aaa;font-size:11px;margin-top:2px;">HP ' + enemyData.hp + '/' + enemyData.maxHp + '</div>';
-        html += '</div>';
-        html += '<div style="display:flex;justify-content:center;gap:20px;color:#999;font-size:11px;">';
-        html += '<span>攻击 ' + enemyData.atk + '</span><span>防御 ' + enemyData.def + '</span>';
-        html += '</div></div>';
+        // Monster info
+        var monsterDiv = el('div', { id: 'realm-monster-info', style: 'margin-bottom:8px;' });
+        monsterDiv.appendChild(el('div', { style: 'font-size:13px;color:' + titleColor + ';font-weight:bold;margin-bottom:4px;', textContent: enemyData.name }));
+        var mBar = createProgressBar(enemyData.hp, enemyData.maxHp, barColor,
+            formatNumber(enemyData.hp) + ' / ' + formatNumber(enemyData.maxHp));
+        mBar.id = 'realm-enemy-hp-bar';
+        monsterDiv.appendChild(mBar);
+        monsterDiv.appendChild(el('div', {
+            style: 'display:flex;gap:16px;color:#999;font-size:11px;margin-top:2px;',
+            innerHTML: '<span>攻击 ' + enemyData.atk + '</span><span>防御 ' + enemyData.def + '</span>'
+        }));
+        wrapper.appendChild(monsterDiv);
 
-        html += '<div style="display:flex;gap:8px;justify-content:center;">';
-        html += '<button class="btn" onclick="MysticRealm.doAttack()" style="background:linear-gradient(135deg,#d4a017,#b8860b);color:#000;font-weight:bold;border:none;border-radius:6px;padding:8px 20px;">攻击</button>';
-        html += '<button class="btn" onclick="MysticRealm.exitEndlessTrial()" style="background:#555;color:#fff;border:none;border-radius:6px;padding:8px 20px;">退出并结算</button>';
-        html += '</div>';
+        // Player bar
+        var playerDiv = el('div', { id: 'realm-player-bar', style: 'margin-bottom:8px;' });
+        playerDiv.appendChild(el('div', { style: 'font-size:12px;color:#2ecc71;margin-bottom:3px;', textContent: '角色生命' }));
+        var pBar = createProgressBar(Game.data.hp, pDisplayMaxHp,
+            'linear-gradient(90deg,#1e8449,#2ecc71)',
+            formatNumber(Game.data.hp) + ' / ' + formatNumber(pDisplayMaxHp));
+        pBar.id = 'realm-player-hp-bar';
+        playerDiv.appendChild(pBar);
+        wrapper.appendChild(playerDiv);
 
-        html += '<div id="realm-battle-log" style="margin-top:10px;max-height:120px;overflow-y:auto;color:#aaa;font-size:11px;"></div>';
-        html += '</div>';
+        // Battle log
+        wrapper.appendChild(el('div', {
+            id: 'realm-battle-log',
+            style: 'max-height:100px;overflow-y:auto;color:#aaa;font-size:11px;margin-bottom:8px;padding:6px;background:rgba(0,0,0,0.2);border-radius:4px;'
+        }));
 
-        container.innerHTML = html;
-        container.setAttribute('data-enemy', JSON.stringify(enemyData));
-        container.setAttribute('data-endless', '1');
+        // Buttons
+        var btnRow = el('div', { style: 'display:flex;gap:8px;' });
+        btnRow.appendChild(el('button', {
+            id: 'realm-auto-btn', className: 'btn', textContent: '⚡ 自动', onclick: 'MysticRealm.toggleAutoBattle()',
+            style: 'background:#555;color:#ccc;border:none;border-radius:6px;padding:8px 14px;font-size:12px;'
+        }));
+        btnRow.appendChild(el('button', {
+            className: 'btn', textContent: '攻击', onclick: 'MysticRealm.doAttack()',
+            style: 'background:linear-gradient(135deg,#d4a017,#b8860b);color:#000;font-weight:bold;border:none;border-radius:6px;padding:8px 20px;'
+        }));
+        btnRow.appendChild(el('button', {
+            className: 'btn', textContent: '退出并结算', onclick: 'MysticRealm.exitEndlessTrial()',
+            style: 'background:#555;color:#fff;border:none;border-radius:6px;padding:8px 20px;'
+        }));
+        wrapper.appendChild(btnRow);
+        container.appendChild(wrapper);
     }
 
     /* ===========================================
@@ -1319,6 +1460,8 @@ var MysticRealm = (function () {
        无尽试炼退出
        =========================================== */
     function exitEndlessTrial() {
+        clearAutoBattleTimer();
+        state._enemyData = null;
         state.inBattle = false;
         state.isEndless = false;
         var finalWave = state.endlessWave - 1;

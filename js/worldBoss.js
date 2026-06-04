@@ -4,21 +4,35 @@
    ============================================================ */
 
 var WORLD_BOSSES = [
-    { name: '千年蛇妖', realmRequired: 2, atk: 1000, def: 750, hp: 4000, respawnHours: 2,
+    { name: '千年蛇妖', realmRequired: 2, respawnHours: 2,
       rewardStones: 500, rewardContribution: 50, killReward: { stones: 1000, contribution: 100 } },
-    { name: '万年尸王', realmRequired: 3, atk: 2300, def: 1650, hp: 7500, respawnHours: 4,
+    { name: '万年尸王', realmRequired: 3, respawnHours: 4,
       rewardStones: 1200, rewardContribution: 100, killReward: { stones: 2500, contribution: 200 } },
-    { name: '远古魔龙', realmRequired: 4, atk: 4600, def: 3400, hp: 14500, respawnHours: 6,
+    { name: '远古魔龙', realmRequired: 4, respawnHours: 6,
       rewardStones: 3000, rewardContribution: 200, killReward: { stones: 6000, contribution: 400 } },
-    { name: '九尾天狐', realmRequired: 5, atk: 9500, def: 6900, hp: 26000, respawnHours: 8,
+    { name: '九尾天狐', realmRequired: 5, respawnHours: 8,
       rewardStones: 8000, rewardContribution: 400, killReward: { stones: 16000, contribution: 800 } },
-    { name: '混世魔尊', realmRequired: 6, atk: 19000, def: 13500, hp: 49000, respawnHours: 12,
+    { name: '混世魔尊', realmRequired: 6, respawnHours: 12,
       rewardStones: 20000, rewardContribution: 800, killReward: { stones: 40000, contribution: 1600 } },
-    { name: '灭世龙皇', realmRequired: 7, atk: 38000, def: 27000, hp: 100000, respawnHours: 16,
+    { name: '灭世龙皇', realmRequired: 7, respawnHours: 16,
       rewardStones: 50000, rewardContribution: 1600, killReward: { stones: 100000, contribution: 3200 } },
-    { name: '天道化身', realmRequired: 8, atk: 75000, def: 52500, hp: 190000, respawnHours: 24,
+    { name: '天道化身', realmRequired: 8, respawnHours: 24,
       rewardStones: 120000, rewardContribution: 3200, killReward: { stones: 250000, contribution: 6400 } }
 ];
+
+/**
+ * 动态计算世界Boss属性（基于玩家有效属性）
+ * @param {number} bossIndex — WORLD_BOSSES 索引
+ * @returns {{ hp: number, atk: number, def: number }}
+ */
+function getBossStats(bossIndex) {
+    var playerEff = Cultivation.getEffectiveStats();
+    return {
+        hp: Math.floor(playerEff.hp * 8.0),
+        atk: Math.floor(playerEff.atk * 0.8),
+        def: Math.floor(playerEff.def * 0.7)
+    };
+}
 
 var BOSS_EXTRA_CHANCE_COSTS = [1000, 2000, 5000, 10000];
 
@@ -101,7 +115,7 @@ var WorldBoss = {
             var bd = Game.data.bossData[i];
             if (bd && !bd.alive && bd.respawnAt && now >= bd.respawnAt) {
                 bd.alive = true;
-                bd.hp = WORLD_BOSSES[i].hp;
+                bd.hp = getBossStats(i).hp;
                 bd.respawnAt = null;
                 bd.topDamage = [];
                 changed = true;
@@ -117,7 +131,7 @@ var WorldBoss = {
         var boss = WORLD_BOSSES[bossIndex];
         if (!Game.data.bossData[bossIndex]) {
             Game.data.bossData[bossIndex] = {
-                hp: boss.hp,
+                hp: getBossStats(bossIndex).hp,
                 alive: true,
                 respawnAt: null,
                 topDamage: []
@@ -157,7 +171,7 @@ var WorldBoss = {
             var boss = WORLD_BOSSES[i];
             var bd = this._getBossData(i);
             var unlocked = playerRealm >= boss.realmRequired;
-            var hpPct = bd.alive && bd.hp > 0 ? Math.max(0, Math.floor(bd.hp / boss.hp * 100)) : 0;
+            var hpPct = bd.alive && bd.hp > 0 ? Math.max(0, Math.floor(bd.hp / getBossStats(i).hp * 100)) : 0;
 
             // 刷新倒计时
             var countdownHtml = '';
@@ -193,7 +207,7 @@ var WorldBoss = {
                 html += '<div class="boss-card-hp-bar">' +
                     '<div class="boss-card-hp-fill" style="width:' + hpPct + '%;"></div>' +
                     '</div>' +
-                    '<div class="boss-card-hp-text">' + formatNumber(bd.hp) + ' / ' + formatNumber(boss.hp) + '</div>';
+                    '<div class="boss-card-hp-text">' + formatNumber(bd.hp) + ' / ' + formatNumber(getBossStats(i).hp) + '</div>';
             } else {
                 html += '<div class="boss-card-hp-bar dead-bar"><div class="boss-card-hp-fill dead-fill" style="width:0%;"></div></div>';
                 html += countdownHtml;
@@ -288,7 +302,9 @@ var WorldBoss = {
         var bd = this._getBossData(bossIndex);
         this.currentBossIndex = bossIndex;
 
-        var hpPct = bd.alive ? Math.max(0, Math.floor(bd.hp / boss.hp * 100)) : 0;
+        var bossStats = getBossStats(bossIndex);
+
+        var hpPct = bd.alive ? Math.max(0, Math.floor(bd.hp / bossStats.hp * 100)) : 0;
         var now = Date.now();
 
         var html = '';
@@ -303,15 +319,15 @@ var WorldBoss = {
 
         // 属性
         html += '<div class="boss-detail-stats">' +
-            '<span>ATK ' + formatNumber(boss.atk) + '</span>' +
-            '<span>DEF ' + formatNumber(boss.def) + '</span>' +
-            '<span>HP ' + formatNumber(boss.hp) + '</span>' +
+            '<span>ATK ' + formatNumber(bossStats.atk) + '</span>' +
+            '<span>DEF ' + formatNumber(bossStats.def) + '</span>' +
+            '<span>HP ' + formatNumber(bossStats.hp) + '</span>' +
             '</div>';
 
         // 大血量条
         if (bd.alive) {
             html += '<div class="boss-hp-section">' +
-                '<div class="boss-hp-label">' + formatNumber(bd.hp) + ' / ' + formatNumber(boss.hp) + '</div>' +
+                '<div class="boss-hp-label">' + formatNumber(bd.hp) + ' / ' + formatNumber(bossStats.hp) + '</div>' +
                 '<div class="boss-hp-bar">' +
                 '<div class="boss-hp-fill" style="width:' + hpPct + '%;"></div>' +
                 '</div>' +
@@ -456,7 +472,7 @@ var WorldBoss = {
         this.battleTick = 0;
         this.battleBossIndex = bossIndex;
         this.battleBoss = boss;
-        this.battleBossMaxHp = boss.hp;
+        this.battleBossMaxHp = getBossStats(bossIndex).hp;
         this.battleBossHp = bd.hp;
         this.battleTotalDamage = 0;
 
@@ -611,11 +627,12 @@ var WorldBoss = {
         // 玩家伤害：max(1, 玩家ATK * (0.8~1.2随机) - BossDEF * 0.3)，暴击1.5倍
         var playerRaw = playerAtk * (0.8 + Math.random() * 0.4);
         var isCrit = Math.random() < totalCritRate;
-        var playerDmg = Math.max(1, Math.floor(playerRaw - boss.def * 0.3));
+        var bossStatsTick = getBossStats(this.battleBossIndex);
+        var playerDmg = Math.max(1, Math.floor(playerRaw - bossStatsTick.def * 0.3));
         if (isCrit) playerDmg = Math.floor(playerDmg * 1.5);
 
         // Boss伤害：max(1, BossATK * (0.8~1.2随机) - 玩家DEF * 0.4)
-        var bossRaw = boss.atk * (0.8 + Math.random() * 0.4);
+        var bossRaw = bossStatsTick.atk * (0.8 + Math.random() * 0.4);
         var bossDmg = Math.max(1, Math.floor(bossRaw - playerDef * 0.4));
 
         // 技能护盾吸收

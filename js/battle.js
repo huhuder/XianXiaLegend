@@ -23,16 +23,16 @@ var Battle = {
        地图数据（按境界解锁）
        ---------------------------------------------------------- */
     ZONES: [
-        { name: '妖兽森林', unlockRealm: 0, unlockIndex: 0, monster: '妖兽', hp: 100, atk: 10, def: 5, exp: 50, spirit: 30 },
-        { name: '幽冥鬼窟', unlockRealm: 1, unlockIndex: 1, monster: '厉鬼', hp: 300, atk: 30, def: 15, exp: 150, spirit: 80 },
-        { name: '血炼深渊', unlockRealm: 2, unlockIndex: 2, monster: '魔物', hp: 800, atk: 80, def: 40, exp: 400, spirit: 200 },
-        { name: '上古遗迹', unlockRealm: 3, unlockIndex: 3, monster: '石魔', hp: 2000, atk: 200, def: 100, exp: 1000, spirit: 500 },
-        { name: '龙脉秘境', unlockRealm: 4, unlockIndex: 4, monster: '蛟龙', hp: 5000, atk: 500, def: 250, exp: 2500, spirit: 1200 },
-        { name: '破灭荒原', unlockRealm: 5, unlockIndex: 5, monster: '荒兽', hp: 12000, atk: 1200, def: 600, exp: 6000, spirit: 3000 },
-        { name: '星空古路', unlockRealm: 6, unlockIndex: 6, monster: '星兽', hp: 30000, atk: 3000, def: 1500, exp: 15000, spirit: 7000 },
-        { name: '轮回之地', unlockRealm: 7, unlockIndex: 7, monster: '亡灵', hp: 80000, atk: 8000, def: 4000, exp: 40000, spirit: 18000 },
-        { name: '混沌裂隙', unlockRealm: 8, unlockIndex: 8, monster: '天魔', hp: 200000, atk: 20000, def: 10000, exp: 100000, spirit: 50000 },
-        { name: '天道战场', unlockRealm: 9, unlockIndex: 9, monster: '道兵', hp: 500000, atk: 50000, def: 25000, exp: 250000, spirit: 120000 }
+        { name: '妖兽森林', unlockRealm: 0, unlockIndex: 0, monster: '妖兽', exp: 50, spirit: 30 },
+        { name: '幽冥鬼窟', unlockRealm: 1, unlockIndex: 1, monster: '厉鬼', exp: 150, spirit: 80 },
+        { name: '血炼深渊', unlockRealm: 2, unlockIndex: 2, monster: '魔物', exp: 400, spirit: 200 },
+        { name: '上古遗迹', unlockRealm: 3, unlockIndex: 3, monster: '石魔', exp: 1000, spirit: 500 },
+        { name: '龙脉秘境', unlockRealm: 4, unlockIndex: 4, monster: '蛟龙', exp: 2500, spirit: 1200 },
+        { name: '破灭荒原', unlockRealm: 5, unlockIndex: 5, monster: '荒兽', exp: 6000, spirit: 3000 },
+        { name: '星空古路', unlockRealm: 6, unlockIndex: 6, monster: '星兽', exp: 15000, spirit: 7000 },
+        { name: '轮回之地', unlockRealm: 7, unlockIndex: 7, monster: '亡灵', exp: 40000, spirit: 18000 },
+        { name: '混沌裂隙', unlockRealm: 8, unlockIndex: 8, monster: '天魔', exp: 100000, spirit: 50000 },
+        { name: '天道战场', unlockRealm: 9, unlockIndex: 9, monster: '道兵', exp: 250000, spirit: 120000 }
     ],
 
     /** BOSS名称词库 */
@@ -40,6 +40,26 @@ var Battle = {
 
     /** 速度倍率 */
     SPEEDS: { '1x': 1000, '2x': 500, '3x': 333 },
+
+    /* ----------------------------------------------------------
+       动态怪物属性（基于玩家有效属性）
+       ---------------------------------------------------------- */
+    getZoneMonsterStats: function (zoneIndex) {
+        var playerEff = Cultivation.getEffectiveStats();
+        var diffCoeff = Math.pow(1.5, zoneIndex - Game.data.realmIndex);
+        diffCoeff = Math.max(0.3, Math.min(3.0, diffCoeff));
+
+        var stats = {
+            hp: Math.floor(playerEff.hp * 0.6 * diffCoeff),
+            atk: Math.floor(playerEff.atk * 0.3 * diffCoeff),
+            def: Math.floor(playerEff.def * 0.2 * diffCoeff)
+        };
+        // BOSS属性在普通怪基础上翻倍
+        stats.bossHp = Math.floor(stats.hp * 3);
+        stats.bossAtk = Math.floor(stats.atk * 2);
+        stats.bossDef = Math.floor(stats.def * 2);
+        return stats;
+    },
 
     /* ----------------------------------------------------------
        战斗状态
@@ -206,6 +226,10 @@ var Battle = {
 
         var zone = this.ZONES[this.zoneIndex];
 
+        // 动态计算怪物属性
+        var stats = this.getZoneMonsterStats(this.zoneIndex);
+        this._zoneStats = stats;
+
         // 20%概率刷BOSS
         this.isBoss = Math.random() < 0.2;
 
@@ -215,11 +239,11 @@ var Battle = {
         var bossName = '';
         if (this.isBoss) {
             bossName = this.BOSS_NAMES[randInt(0, this.BOSS_NAMES.length - 1)] + zone.monster + '王';
-            this.monsterHP = zone.hp * 3;
-            this.monsterMaxHP = zone.hp * 3;
+            this.monsterHP = stats.bossHp;
+            this.monsterMaxHP = stats.bossHp;
         } else {
-            this.monsterHP = zone.hp;
-            this.monsterMaxHP = zone.hp;
+            this.monsterHP = stats.hp;
+            this.monsterMaxHP = stats.hp;
         }
 
         // 渲染怪物信息
@@ -653,7 +677,8 @@ var Battle = {
         }
 
         // 怪物攻击
-        var monsterAtk = this.isBoss ? zone.atk * 2 : zone.atk;
+        var stats = this._zoneStats;
+        var monsterAtk = this.isBoss ? stats.bossAtk : stats.atk;
         var monsterRaw = monsterAtk * random(0.9, 1.1);
         var monsterDmg = Math.max(1, Math.floor(monsterRaw - effectiveDef * 0.3));
 
