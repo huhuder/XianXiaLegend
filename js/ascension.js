@@ -420,6 +420,11 @@ var Ascension = {
             Talents.addPoints(3);
         }
 
+        // 增加技能槽（最多5个）
+        if (typeof Skills !== 'undefined') {
+            Game.data.skillSlots = Math.min((Game.data.skillSlots || 2) + 1, 5);
+        }
+
         // 属性乘以 1.2
         var mult = 1.2;
         Game.data.hp = Math.floor(Game.data.hp * mult);

@@ -98,6 +98,7 @@ var Battle = {
         this.active = true;
         this.killCount = 0;
         this.bossKillCount = 0;
+        this._monsterStunned = 0;
 
         // 计算宗门加成后的最大HP
         var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus)
@@ -237,6 +238,9 @@ var Battle = {
 
         // 20%概率刷BOSS
         this.isBoss = Math.random() < 0.2;
+
+        // 重置技能状态
+        this._monsterStunned = 0;
 
         var bossName = '';
         if (this.isBoss) {
@@ -429,17 +433,182 @@ var Battle = {
         var talentEff = (typeof Talents !== 'undefined' && Talents.getEffects)
             ? Talents.getEffects() : { atkPct: 0, hpPct: 0, defPct: 0, critRate: 0, critDmg: 0, dmgReduce: 0, lifestealOnCrit: 0, regenPerTick: 0 };
 
-        // 角色攻击（含宗门+天赋加成）
-        var effectiveAtk = Math.floor(Game.data.attack * (1 + sectBonus.atkPct / 100 + buffBonus.atkPct / 100 + talentEff.atkPct / 100));
-        var effectiveDef = Math.floor(Game.data.defense * (1 + sectBonus.defPct / 100 + buffBonus.defPct / 100 + talentEff.defPct / 100));
-        var effectiveHp = Math.floor(Game.data.hp * (1 + sectBonus.hpPct / 100 + buffBonus.hpPct / 100 + talentEff.hpPct / 100));
+        // 角色攻击（含宗门+天赋+技能Buff加成）
+        var skillAtkBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_atk') : 0;
+        var skillAllBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_all') : 0;
+        var totalAtkPct = sectBonus.atkPct + buffBonus.atkPct + talentEff.atkPct + skillAtkBuff + skillAllBuff;
+        var totalDefPct = sectBonus.defPct + buffBonus.defPct + talentEff.defPct + skillAllBuff;
+        var totalHpPct = sectBonus.hpPct + buffBonus.hpPct + talentEff.hpPct + skillAllBuff;
+        var effectiveAtk = Math.floor(Game.data.attack * (1 + totalAtkPct / 100));
+        var effectiveDef = Math.floor(Game.data.defense * (1 + totalDefPct / 100));
+        var effectiveHp = Math.floor(Game.data.hp * (1 + totalHpPct / 100));
 
-        // 角色攻击
+        // 技能冷却和Buff维护
+        if (typeof Skills !== 'undefined') {
+            Skills.tickCooldowns();
+            Skills.tickBuffs();
+        }
+
+        // ========== 技能释放（普攻前） ==========
+        var skillUsed = false;
+        if (typeof Skills !== 'undefined') {
+            var readySkills = Skills.getReadySkills();
+            if (readySkills.length > 0) {
+                var skill = readySkills[0]; // 取第一个就绪技能
+                skillUsed = true;
+                Skills.setCooldown(skill.id, skill.cd);
+
+                var skillDmg = 0;
+                switch (skill.type) {
+                    case 'damage':
+                        skillDmg = Math.floor(effectiveAtk * skill.value / 100);
+                        this.addLog('【' + skill.name + '】造成 ' + skillDmg + ' 点伤害', '#ffd700');
+                        break;
+
+                    case 'aoe':
+                        skillDmg = Math.floor(effectiveAtk * skill.value / 100);
+                        var splashDmg = Math.floor(skillDmg * (skill.splash || 50) / 100);
+                        this.addLog('【' + skill.name + '】AoE ' + skillDmg + ' + 溅射' + splashDmg, '#ffd700');
+                        skillDmg += splashDmg;
+                        break;
+
+                    case 'multi_hit':
+                        var hits = skill.hits || 3;
+                        for (var hi = 0; hi < hits; hi++) {
+                            skillDmg += Math.floor(effectiveAtk * skill.value / 100);
+                        }
+                        this.addLog('【' + skill.name + '】' + hits + '段攻击，共 ' + skillDmg + ' 点伤害', '#ffd700');
+                        break;
+
+                    case 'execute':
+                        var hpPct = this.monsterHP / this.monsterMaxHP * 100;
+                        if (hpPct <= (skill.threshold || 25)) {
+                            skillDmg = Math.floor(effectiveAtk * skill.value / 100);
+                            this.addLog('【' + skill.name + '】斩杀！造成 ' + skillDmg + ' 点伤害', '#ff4444');
+                        } else {
+                            skillDmg = Math.floor(effectiveAtk * skill.value / 100 * 0.5);
+                            this.addLog('【' + skill.name + '】HP未达斩杀线，造成 ' + skillDmg + ' 点伤害', '#ffd700');
+                        }
+                        break;
+
+                    case 'dot':
+                        skillDmg = Math.floor(effectiveAtk * skill.value / 100);
+                        Skills.addBuff('dot', Math.floor(effectiveAtk * (skill.dotValue || 10) / 100), skill.dotDuration || 3);
+                        this.addLog('【' + skill.name + '】' + skillDmg + ' + 灼烧' + (skill.dotDuration || 3) + 'tick', '#ff8800');
+                        break;
+
+                    case 'stun':
+                        skillDmg = Math.floor(effectiveAtk * skill.value / 100);
+                        this.addLog('【' + skill.name + '】' + skillDmg + ' + 麻痹' + (skill.stunDuration || 1) + 'tick', '#ffd700');
+                        // stun效果：怪物跳过下次攻击
+                        this._monsterStunned = (skill.stunDuration || 1);
+                        break;
+
+                    case 'lifesteal':
+                        skillDmg = Math.floor(effectiveAtk * skill.value / 100);
+                        var stealHeal = Math.floor(skillDmg * (skill.lifestealPct || 30) / 100);
+                        this.playerHP = Math.min(this.playerHP + stealHeal, effectiveHp);
+                        this.addLog('【' + skill.name + '】' + skillDmg + ' + 吸血' + stealHeal, '#ff8800');
+                        break;
+
+                    case 'sacrifice':
+                        var hpCost = Math.floor(effectiveHp * (skill.hpCost || 15) / 100);
+                        this.playerHP = Math.max(1, this.playerHP - hpCost);
+                        skillDmg = Math.floor(effectiveAtk * skill.value / 100);
+                        this.addLog('【' + skill.name + '】消耗' + hpCost + 'HP，造成 ' + skillDmg + ' 点伤害', '#ff4444');
+                        break;
+
+                    case 'heal':
+                        var healAmt = Math.floor(effectiveHp * skill.value / 100);
+                        this.playerHP = Math.min(this.playerHP + healAmt, effectiveHp);
+                        this.addLog('【' + skill.name + '】恢复 ' + healAmt + ' 点生命', '#2ecc71');
+                        break;
+
+                    case 'shield':
+                        var shieldVal = Math.floor(effectiveAtk * skill.value / 100);
+                        Skills.setShield(shieldVal);
+                        this.addLog('【' + skill.name + '】护盾 ' + shieldVal + ' 点', '#3399ff');
+                        break;
+
+                    case 'buff_atk':
+                        Skills.addBuff('buff_atk', skill.value, skill.duration || 3);
+                        this.addLog('【' + skill.name + '】攻击+' + skill.value + '% ' + (skill.duration || 3) + 'tick', '#ffd700');
+                        break;
+
+                    case 'buff_all':
+                        Skills.addBuff('buff_all', skill.value, skill.duration || 5);
+                        this.addLog('【' + skill.name + '】全属性+' + skill.value + '% ' + (skill.duration || 5) + 'tick', '#ffd700');
+                        break;
+
+                    case 'dodge':
+                        Skills.addBuff('dodge', skill.value, skill.duration || 2);
+                        this.addLog('【' + skill.name + '】闪避+' + skill.value + '% ' + (skill.duration || 2) + 'tick', '#3399ff');
+                        break;
+
+                    case 'crit_dmg_buff':
+                        Skills.addBuff('crit_dmg_buff', skill.value, skill.duration || 3);
+                        this.addLog('【' + skill.name + '】暴伤+' + skill.value + '% ' + (skill.duration || 3) + 'tick', '#ffd700');
+                        break;
+
+                    case 'extra_attack':
+                        Skills.addBuff('extra_attack', skill.value, skill.duration || 5);
+                        this.addLog('【' + skill.name + '】攻击次数+' + skill.value + ' ' + (skill.duration || 5) + 'tick', '#ffd700');
+                        break;
+
+                    case 'damage_reduce':
+                        Skills.addBuff('damage_reduce', skill.value, skill.duration || 3);
+                        this.addLog('【' + skill.name + '】减伤+' + skill.value + '% ' + (skill.duration || 3) + 'tick', '#3399ff');
+                        break;
+
+                    case 'counter':
+                        Skills.addBuff('counter', skill.value, skill.duration || 2);
+                        this.addLog('【' + skill.name + '】反伤+' + skill.value + '% ' + (skill.duration || 2) + 'tick', '#ff8800');
+                        break;
+
+                    case 'block':
+                        Skills.addBuff('block', skill.value, skill.duration || 3);
+                        this.addLog('【' + skill.name + '】格挡+' + skill.value + '% ' + (skill.duration || 3) + 'tick', '#3399ff');
+                        break;
+
+                    default:
+                        skillDmg = Math.floor(effectiveAtk * skill.value / 100);
+                        this.addLog('【' + skill.name + '】造成 ' + skillDmg + ' 点伤害', '#ffd700');
+                }
+
+                // 技能伤害结算
+                if (skillDmg > 0) {
+                    this.monsterHP -= skillDmg;
+                    this.updateMonsterBar();
+                    if (this.monsterHP <= 0) {
+                        this.monsterHP = 0;
+                        this.updateMonsterBar();
+                        this.onMonsterKilled(zone, monsterName);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // ========== 普攻 ==========
         var baseDmg = effectiveAtk * random(0.8, 1.2);
         var totalCritRate = (Game.data.critRate || 0.05) + effects.critRate / 100 + talentEff.critRate / 100;
-        var critMultiplier = 1.5 + talentEff.critDmg / 100;
+        var skillCritDmgBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('crit_dmg_buff') : 0;
+        var critMultiplier = 1.5 + talentEff.critDmg / 100 + skillCritDmgBuff / 100;
         var isCrit = Math.random() < totalCritRate;
         var playerDmg = Math.floor(isCrit ? baseDmg * critMultiplier : baseDmg);
+
+        // 额外攻击次数（御剑术等）
+        var extraAttacks = (typeof Skills !== 'undefined') ? Skills.getBuffValue('extra_attack') : 0;
+        var totalAttacks = 1 + extraAttacks;
+        var totalPlayerDmg = 0;
+        for (var atkIdx = 0; atkIdx < totalAttacks; atkIdx++) {
+            var atkDmg = Math.floor(isCrit ? (effectiveAtk * random(0.8, 1.2) * critMultiplier) : (effectiveAtk * random(0.8, 1.2)));
+            totalPlayerDmg += atkDmg;
+        }
+        if (totalAttacks > 1) {
+            playerDmg = totalPlayerDmg;
+            this.addLog('额外攻击×' + totalAttacks + '！', '#ffd700');
+        }
 
         // 套装额外伤害：青龙6件，20%概率附带50%额外伤害
         if (effects.extraDmgChance > 0 && Math.random() < effects.extraDmgChance / 100) {
@@ -494,13 +663,35 @@ var Battle = {
         var monsterRaw = monsterAtk * random(0.9, 1.1);
         var monsterDmg = Math.max(1, Math.floor(monsterRaw - effectiveDef * 0.3));
 
+        // 技能减伤
+        var skillDmgReduce = (typeof Skills !== 'undefined') ? Skills.getBuffValue('damage_reduce') : 0;
+        if (skillDmgReduce > 0) {
+            monsterDmg = Math.max(1, Math.floor(monsterDmg * (1 - skillDmgReduce / 100)));
+        }
+
         // 天赋伤害减免
         if (talentEff.dmgReduce > 0) {
             monsterDmg = Math.max(1, Math.floor(monsterDmg * (1 - talentEff.dmgReduce / 100)));
         }
 
-        // 闪避判定
-        if (effects.dodgeRate > 0 && Math.random() < effects.dodgeRate / 100) {
+        // 技能格挡
+        var skillBlock = (typeof Skills !== 'undefined') ? Skills.getBuffValue('block') : 0;
+        if (skillBlock > 0 && Math.random() < skillBlock / 100) {
+            monsterDmg = Math.floor(monsterDmg * 0.2);
+            this.addLog('格挡！减免至 ' + monsterDmg + ' 点伤害', '#3399ff');
+        }
+
+        // 眩晕检查：怪物被stun时跳过攻击
+        if (this._monsterStunned && this._monsterStunned > 0) {
+            monsterDmg = 0;
+            this._monsterStunned--;
+            this.addLog(monsterName + '被麻痹，跳过攻击', '#ffd700');
+        }
+
+        // 技能闪避
+        var skillDodge = (typeof Skills !== 'undefined') ? Skills.getBuffValue('dodge') : 0;
+        var totalDodge = effects.dodgeRate + skillDodge;
+        if (monsterDmg > 0 && totalDodge > 0 && Math.random() < totalDodge / 100) {
             monsterDmg = 0;
             this.addLog(monsterName + '攻击被闪避！', '#3399ff');
         }
@@ -511,13 +702,24 @@ var Battle = {
             this.addLog('套装·玄武！减免伤害至 ' + monsterDmg + ' 点', '#3399ff');
         }
 
+        // 护盾吸收
+        if (monsterDmg > 0 && typeof Skills !== 'undefined') {
+            var beforeShield = monsterDmg;
+            monsterDmg = Skills.absorbDamage(monsterDmg);
+            if (monsterDmg < beforeShield) {
+                this.addLog('护盾吸收 ' + (beforeShield - monsterDmg) + ' 点伤害', '#3399ff');
+            }
+        }
+
         this.addLog(monsterName + '攻击，受到 ' + monsterDmg + ' 点伤害', '#cc6666');
 
         this.playerHP -= monsterDmg;
         this.updatePlayerBar();
 
         // 反击判定
-        if (monsterDmg > 0 && effects.counterRate > 0 && Math.random() < effects.counterRate / 100) {
+        var skillCounter = (typeof Skills !== 'undefined') ? Skills.getBuffValue('counter') : 0;
+        var totalCounter = effects.counterRate + skillCounter;
+        if (monsterDmg > 0 && totalCounter > 0 && Math.random() < totalCounter / 100) {
             var counterDmg = Math.floor(playerDmg * 0.5);
             this.monsterHP -= counterDmg;
             this.updateMonsterBar();
@@ -587,6 +789,26 @@ var Battle = {
             var healAmt = Math.floor(maxHp * effects.killHealPct / 100);
             this.playerHP = Math.min(this.playerHP + healAmt, maxHp);
             this.addLog('套装·朱雀！击杀回复 ' + healAmt + ' 点生命', '#2ecc71');
+        }
+
+        // 技能被动：血祭（击杀回复HP）
+        if (typeof Skills !== 'undefined') {
+            var equippedSkills = Skills.getEquippedSkills();
+            for (var eqi = 0; eqi < equippedSkills.length; eqi++) {
+                var eqSkill = equippedSkills[eqi] ? Skills.findSkillById(equippedSkills[eqi]) : null;
+                if (eqSkill && eqSkill.type === 'passive' && eqSkill.id === 's3_3') {
+                    var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus)
+                        ? Sect.getSectBonus() : { hpPct: 0 };
+                    var buffBonus = (typeof Sect !== 'undefined' && Sect.getActiveBuffs)
+                        ? Sect.getActiveBuffs() : { hpPct: 0 };
+                    var skillAllBuff = Skills.getBuffValue('buff_all');
+                    var totalHpPct = sectBonus.hpPct + buffBonus.hpPct + skillAllBuff;
+                    var maxHp = Math.floor(Game.data.hp * (1 + totalHpPct / 100));
+                    var passiveHeal = Math.floor(maxHp * eqSkill.value / 100);
+                    this.playerHP = Math.min(this.playerHP + passiveHeal, maxHp);
+                    this.addLog('血祭·击杀回复 ' + passiveHeal + ' 点生命', '#ff4444');
+                }
+            }
         }
 
         // 宗门任务进度联动 — 击杀
