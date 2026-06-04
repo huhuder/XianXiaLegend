@@ -1144,6 +1144,8 @@ var Equipment = {
                     self.renderInventory();
                 } else if (sub === 'equipped') {
                     self.renderEquipped();
+                } else if (sub === 'talents' && typeof Talents !== 'undefined') {
+                    Talents.render();
                 }
             });
         }
