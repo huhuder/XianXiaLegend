@@ -53,12 +53,16 @@ var Battle = {
        地图数据（按境界解锁）
        ---------------------------------------------------------- */
     ZONES: [
-        { name: '妖兽森林', realmRequired: 0, monsterName: '妖兽',   hp: 100,   atk: 10,   def: 5,   exp: 50,   spirit: 30 },
-        { name: '幽冥鬼窟', realmRequired: 1, monsterName: '厉鬼',   hp: 500,   atk: 40,   def: 20,  exp: 200,  spirit: 100 },
-        { name: '魔渊裂隙', realmRequired: 2, monsterName: '魔物',   hp: 2000,  atk: 150,  def: 80,  exp: 800,  spirit: 400 },
-        { name: '上古遗迹', realmRequired: 3, monsterName: '石魔',   hp: 8000,  atk: 500,  def: 300, exp: 3000, spirit: 1500 },
-        { name: '龙脉秘境', realmRequired: 4, monsterName: '蛟龙',   hp: 30000, atk: 1800, def: 1000,exp: 10000,spirit: 5000 },
-        { name: '天劫废墟', realmRequired: 5, monsterName: '天魔',   hp: 100000,atk: 6000, def: 3000,exp: 40000,spirit: 20000 },
+        { name: '妖兽森林', unlockRealm: 0, unlockIndex: 0, monster: '妖兽', hp: 100, atk: 10, def: 5, exp: 50, spirit: 30 },
+        { name: '幽冥鬼窟', unlockRealm: 1, unlockIndex: 1, monster: '厉鬼', hp: 300, atk: 30, def: 15, exp: 150, spirit: 80 },
+        { name: '血炼深渊', unlockRealm: 2, unlockIndex: 2, monster: '魔物', hp: 800, atk: 80, def: 40, exp: 400, spirit: 200 },
+        { name: '上古遗迹', unlockRealm: 3, unlockIndex: 3, monster: '石魔', hp: 2000, atk: 200, def: 100, exp: 1000, spirit: 500 },
+        { name: '龙脉秘境', unlockRealm: 4, unlockIndex: 4, monster: '蛟龙', hp: 5000, atk: 500, def: 250, exp: 2500, spirit: 1200 },
+        { name: '破灭荒原', unlockRealm: 5, unlockIndex: 5, monster: '荒兽', hp: 12000, atk: 1200, def: 600, exp: 6000, spirit: 3000 },
+        { name: '星空古路', unlockRealm: 6, unlockIndex: 6, monster: '星兽', hp: 30000, atk: 3000, def: 1500, exp: 15000, spirit: 7000 },
+        { name: '轮回之地', unlockRealm: 7, unlockIndex: 7, monster: '亡灵', hp: 80000, atk: 8000, def: 4000, exp: 40000, spirit: 18000 },
+        { name: '混沌裂隙', unlockRealm: 8, unlockIndex: 8, monster: '天魔', hp: 200000, atk: 20000, def: 10000, exp: 100000, spirit: 50000 },
+        { name: '天道战场', unlockRealm: 9, unlockIndex: 9, monster: '道兵', hp: 500000, atk: 50000, def: 25000, exp: 250000, spirit: 120000 }
     ],
 
     /** BOSS名称词库 */

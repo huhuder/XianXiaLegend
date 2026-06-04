@@ -127,7 +127,7 @@ function isMaxRealm(realmIndex, layer) {
 /**
  * 装备最大强化等级
  */
-const EQUIP_MAX_ENHANCE = 15;
+const EQUIP_MAX_ENHANCE = 20;
 
 /**
  * 计算战力（不含特殊效果，基础公式）

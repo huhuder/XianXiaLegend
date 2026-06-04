@@ -6,6 +6,71 @@
 
 var Equipment = {
 
+    // ========== 装备层级（Tier） ==========
+    // 每个境界一张地图，一套专属装备
+    EQUIP_TIERS: [
+        {
+            realm: '凡人', series: '凡铁',
+            names: ['铁剑','布巾','布衣','草鞋','铜环','石坠'],
+            atk: [3,8], def: [2,6], hp: [15,40],
+            qRates: [65, 25, 8, 1.5, 0.4, 0.1]
+        },
+        {
+            realm: '炼气', series: '灵器',
+            names: ['灵风剑','灵光冠','灵纹袍','灵羽靴','灵韵戒','灵心坠'],
+            atk: [18,30], def: [12,22], hp: [80,150],
+            qRates: [55, 28, 12, 3.5, 1.2, 0.3]
+        },
+        {
+            realm: '筑基', series: '法宝',
+            names: ['天罡剑','天罡冠','天罡铠','天罡靴','天罡戒','天罡坠'],
+            atk: [40,70], def: [28,50], hp: [180,320],
+            qRates: [45, 30, 16, 6, 2.5, 0.5]
+        },
+        {
+            realm: '金丹', series: '仙器',
+            names: ['诛仙剑','诛仙冠','诛仙铠','诛仙靴','诛仙戒','诛仙坠'],
+            atk: [85,150], def: [60,110], hp: [380,680],
+            qRates: [35, 30, 18, 10, 5.5, 1.5]
+        },
+        {
+            realm: '元婴', series: '圣器',
+            names: ['盘古斧','盘古冠','开天铠','破碎靴','盘古戒','起源坠'],
+            atk: [180,320], def: [130,240], hp: [800,1450],
+            qRates: [28, 28, 20, 14, 8, 2]
+        },
+        {
+            realm: '化神', series: '荒器',
+            names: ['裂荒斧','荒神冠','荒古铠','踏荒靴','荒天戒','荒元坠'],
+            atk: [380,680], def: [280,500], hp: [1700,3100],
+            qRates: [22, 25, 22, 18, 10, 3]
+        },
+        {
+            realm: '合体', series: '星器',
+            names: ['星辰剑','星辉冠','星河铠','星痕靴','星芒戒','星云坠'],
+            atk: [800,1450], def: [600,1050], hp: [3600,6500],
+            qRates: [18, 22, 25, 20, 12, 3]
+        },
+        {
+            realm: '大乘', series: '轮回器',
+            names: ['轮回剑','轮回冠','轮回铠','轮回靴','轮回戒','轮回坠'],
+            atk: [1700,3100], def: [1300,2300], hp: [7500,14000],
+            qRates: [15, 20, 25, 22, 14, 4]
+        },
+        {
+            realm: '渡劫', series: '混沌器',
+            names: ['混沌刃','混沌冠','混沌甲','混沌靴','混沌戒','混沌坠'],
+            atk: [3600,6500], def: [2700,5000], hp: [16000,30000],
+            qRates: [12, 18, 25, 24, 16, 5]
+        },
+        {
+            realm: '真仙', series: '天道器',
+            names: ['天道剑','天道冠','天道铠','天道靴','天道戒','天道坠'],
+            atk: [7500,14000], def: [5500,10000], hp: [35000,65000],
+            qRates: [10, 15, 25, 25, 18, 7]
+        }
+    ],
+
     /* ----------------------------------------------------------
        装备品质常量
        ---------------------------------------------------------- */
@@ -119,12 +184,15 @@ var Equipment = {
        @param {number} mapIndex - 地图索引
        ---------------------------------------------------------- */
     generateEquip: function (mapIndex) {
-        // 随机品质（按概率）
+        var tierIndex = mapIndex;
+        var tier = this.EQUIP_TIERS[tierIndex];
+
+        // 随机品质（按 Tier 品质率）
         var qualityIndex = 0;
-        var roll = Math.random();
+        var roll = Math.random() * 100;
         var cumulative = 0;
-        for (var i = 0; i < this.QUALITIES.length; i++) {
-            cumulative += this.QUALITIES[i].rate;
+        for (var i = 0; i < tier.qRates.length; i++) {
+            cumulative += tier.qRates[i];
             if (roll <= cumulative) {
                 qualityIndex = i;
                 break;
@@ -146,36 +214,37 @@ var Equipment = {
             setSlotName = set.slots[slotIndex];
         }
 
-        // 名称：有套装时用套装件名，否则从词库取词
+        // 名称：[品质]·[套装件名] 或 [品质]·[系列][部位名]
         var equipName;
         if (setName && setSlotName) {
             equipName = quality.name + '·' + setSlotName;
         } else {
-            var names = this.WORD_BANK[slotIndex];
-            var word = names[randInt(0, names.length - 1)];
-            equipName = quality.name + '·' + word;
-            setSlotName = word; // 无套装时也记录原始词库名
+            equipName = quality.name + '·' + tier.series + tier.names[slotIndex];
+            setSlotName = tier.names[slotIndex];
         }
 
-        // 属性计算：地图系数 × 品质倍率 × 随机基础值
-        var mapCoeff = getRealmMultiplier(mapIndex);  // 1, 2, 4, 8, 16, 32
-        var atkBase = randInt(3, 8);
-        var defBase = randInt(2, 6);
-        var hpBase  = randInt(15, 40);
+        // 基础属性从 Tier 范围随机 × 品质倍率
+        var baseAtk = Math.floor(randInt(tier.atk[0], tier.atk[1]) * quality.mult);
+        var baseDef = Math.floor(randInt(tier.def[0], tier.def[1]) * quality.mult);
+        var baseHp  = Math.floor(randInt(tier.hp[0], tier.hp[1]) * quality.mult);
 
         var equip = {
             id: this.nextId++,
             name: equipName,
             quality: qualityIndex,
             slot: slotIndex,
-            atk: Math.floor(atkBase * quality.mult * mapCoeff),
-            def: Math.floor(defBase * quality.mult * mapCoeff),
-            hp:  Math.floor(hpBase  * quality.mult * mapCoeff),
+            baseAtk: baseAtk,
+            baseDef: baseDef,
+            baseHp:  baseHp,
+            atk: baseAtk,
+            def: baseDef,
+            hp:  baseHp,
             enhance: 0,
+            tier: tierIndex,
             mapIndex: mapIndex,
             effects: this.rollEffects(qualityIndex),
-            setName: setName,          // 套装名，无套装为 null
-            setSlotName: setSlotName,  // 套装件名（有套装）或词库名（无套装）
+            setName: setName,
+            setSlotName: setSlotName,
         };
 
         return equip;
@@ -186,16 +255,18 @@ var Equipment = {
        @param {number} mapIndex - 当前地图索引
        ---------------------------------------------------------- */
     rollDrop: function (mapIndex) {
-        // 标准权重法：计算所有品质的权重总和，累积权重匹配
+        var tier = this.EQUIP_TIERS[mapIndex];
+        var qRates = tier.qRates;
+        // qRates 每个值乘以 0.3 作为权重（保持总掉落率 30%）
         var totalWeight = 0;
-        for (var i = 0; i < this.QUALITIES.length; i++) {
-            totalWeight += this.QUALITIES[i].rate * 0.3;
+        for (var i = 0; i < qRates.length; i++) {
+            totalWeight += qRates[i] * 0.3;
         }
         var roll = Math.random() * totalWeight;
         var cumulative = 0;
         var selectedQuality = -1;
-        for (var i = this.QUALITIES.length - 1; i >= 0; i--) {
-            cumulative += this.QUALITIES[i].rate * 0.3;
+        for (var i = qRates.length - 1; i >= 0; i--) {
+            cumulative += qRates[i] * 0.3;
             if (roll < cumulative) {
                 selectedQuality = i;
                 break;
@@ -215,6 +286,9 @@ var Equipment = {
 
     /** 生成指定品质倾向的装备 */
     generateEquipWithQuality: function (mapIndex, targetQuality) {
+        var tierIndex = mapIndex;
+        var tier = this.EQUIP_TIERS[tierIndex];
+
         // 目标品质 70% 概率，其余按正态分布
         var qualityIndex;
         var r = Math.random();
@@ -246,26 +320,27 @@ var Equipment = {
         if (setName && setSlotName) {
             equipName = quality.name + '·' + setSlotName;
         } else {
-            var names = this.WORD_BANK[slotIndex];
-            var word = names[randInt(0, names.length - 1)];
-            equipName = quality.name + '·' + word;
-            setSlotName = word;
+            equipName = quality.name + '·' + tier.series + tier.names[slotIndex];
+            setSlotName = tier.names[slotIndex];
         }
 
-        var mapCoeff = mapIndex + 1;
-        var atkBase = randInt(3, 8);
-        var defBase = randInt(2, 6);
-        var hpBase  = randInt(15, 40);
+        var baseAtk = Math.floor(randInt(tier.atk[0], tier.atk[1]) * quality.mult);
+        var baseDef = Math.floor(randInt(tier.def[0], tier.def[1]) * quality.mult);
+        var baseHp  = Math.floor(randInt(tier.hp[0], tier.hp[1]) * quality.mult);
 
         return {
             id: this.nextId++,
             name: equipName,
             quality: qualityIndex,
             slot: slotIndex,
-            atk: Math.floor(atkBase * quality.mult * mapCoeff),
-            def: Math.floor(defBase * quality.mult * mapCoeff),
-            hp:  Math.floor(hpBase  * quality.mult * mapCoeff),
+            baseAtk: baseAtk,
+            baseDef: baseDef,
+            baseHp:  baseHp,
+            atk: baseAtk,
+            def: baseDef,
+            hp:  baseHp,
             enhance: 0,
+            tier: tierIndex,
             mapIndex: mapIndex,
             effects: this.rollEffects(qualityIndex),
             setName: setName,
@@ -827,7 +902,8 @@ var Equipment = {
     },
 
     /* ----------------------------------------------------------
-       装备强化
+       装备强化（公式化重构，基于 baseAtk/baseDef/baseHp）
+       属性始终 = Math.floor(base × 1.08^enhance)，无漂移
        @param {object} equip - 装备对象（引用或副本，内部会查找实际引用）
        @param {number} slotIndex - 已装备槽位索引（>=0），背包中为 -1
        @returns {boolean} 是否强化成功
@@ -863,7 +939,21 @@ var Equipment = {
         }
 
         level = equip.enhance || 0;
-        var baseRate = Math.max(30, 100 - level * 5);
+
+        // 兼容旧存档：无 baseAtk 字段时从当前属性反推基础值
+        if (!equip.baseAtk) {
+            equip.baseAtk = Math.round(equip.atk / Math.pow(1.08, level));
+            equip.baseDef = Math.round(equip.def / Math.pow(1.08, level));
+            equip.baseHp  = Math.round(equip.hp  / Math.pow(1.08, level));
+        }
+
+        // 保存旧属性（用于同步 Game.data 差值）
+        var oldAtk = equip.atk;
+        var oldDef = equip.def;
+        var oldHp  = equip.hp;
+
+        // 成功率：Lv0~14 递减（100%→30%），Lv15~19 固定 30%
+        var baseRate = level < 15 ? Math.max(30, 100 - level * 5) : 30;
         var successRate = baseRate + (Game.data.enhanceRateBuff || 0);
         var success = Math.random() * 100 < successRate;
 
@@ -872,40 +962,32 @@ var Equipment = {
         // 消耗强化符 Buff（单次有效）
         Game.data.enhanceRateBuff = 0;
 
-        // 强化前保存当前属性，失败时直接恢复避免数值缩水
-        var preAtk = equip.atk;
-        var preDef = equip.def;
-        var preHp  = equip.hp;
-
+        // 新强化等级
+        var newLevel;
         if (success) {
-            var atkGain = Math.max(1, Math.floor(equip.atk * 0.08));
-            var defGain = Math.max(1, Math.floor(equip.def * 0.08));
-            var hpGain  = Math.max(1, Math.floor(equip.hp * 0.08));
-
-            equip.atk += atkGain;
-            equip.def += defGain;
-            equip.hp  += hpGain;
-            equip.enhance = level + 1;
-
-            if (slotIndex >= 0) {
-                Game.data.attack += atkGain;
-                Game.data.defense += defGain;
-                Game.data.hp     += hpGain;
-            }
-
-            showToast('强化成功！+' + equip.enhance, 1500);
+            newLevel = level + 1;
+            showToast('强化成功！+' + newLevel, 1500);
         } else {
             if (level >= 5) {
-                // 恢复强化前的属性值，杜绝 +8%/-8% 基于不同基数导致的数值缩水
-                equip.atk = preAtk;
-                equip.def = preDef;
-                equip.hp  = preHp;
-                equip.enhance = level - 1;
-
-                showToast('强化失败，等级 ' + level + ' → ' + (level - 1), 2000);
+                newLevel = level - 1;
+                showToast('强化失败，等级 ' + level + ' → ' + newLevel, 2000);
             } else {
+                newLevel = level;
                 showToast('强化失败，无惩罚', 2000);
             }
+        }
+
+        // 公式重算属性（base × 1.08^newLevel），消除增量漂移
+        equip.enhance = newLevel;
+        equip.atk = Math.floor(equip.baseAtk * Math.pow(1.08, newLevel));
+        equip.def = Math.floor(equip.baseDef * Math.pow(1.08, newLevel));
+        equip.hp  = Math.floor(equip.baseHp  * Math.pow(1.08, newLevel));
+
+        // 同步 Game.data 属性差异
+        if (slotIndex >= 0) {
+            Game.data.attack += equip.atk - oldAtk;
+            Game.data.defense += equip.def - oldDef;
+            Game.data.hp     += equip.hp  - oldHp;
         }
 
         Game.updatePower();
