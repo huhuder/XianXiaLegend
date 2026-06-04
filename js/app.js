@@ -63,6 +63,13 @@ var Game = {
         mysticRealmExtraBought: 0,      // 已购买的额外秘境令
         mysticRealmLastRefreshDate: '', // 秘境每日刷新日期
         mysticRealmClearedRealms: [],   // 今日已通关的秘境ID列表
+        // 秘境层数系统（第12批新增）
+        mysticRealmClearedLayers: {},   // 各秘境已通关层 { 'spirit_stone': [0,1,2], ... }
+        mysticRealmSweepDate: '',       // 扫荡日期 'YYYY-MM-DD'
+        mysticRealmSweptLayers: {},     // 今日已扫荡层 { 'spirit_stone': [0,2], ... }
+        endlessTrialMaxLayer: 0,        // 无尽试炼最高通关层数
+        beastEvolutionStones: 0,        // 灵兽进化石
+        beastCultivationPills: 0,       // 灵兽培养丹
         capturedBeasts: [],          // 已捕捉灵兽
         activeBeastIdx: -1,          // 出战灵兽索引
         beastFood: 0,               // 灵兽口粮
@@ -494,6 +501,25 @@ var Game = {
             }
             if (!this.data.beastCaptureSlots || !Array.isArray(this.data.beastCaptureSlots)) {
                 this.data.beastCaptureSlots = [];
+            }
+            // 秘境层数系统兼容（第12批新增）
+            if (!this.data.mysticRealmClearedLayers || typeof this.data.mysticRealmClearedLayers !== 'object') {
+                this.data.mysticRealmClearedLayers = {};
+            }
+            if (this.data.mysticRealmSweepDate === undefined || this.data.mysticRealmSweepDate === null) {
+                this.data.mysticRealmSweepDate = '';
+            }
+            if (!this.data.mysticRealmSweptLayers || typeof this.data.mysticRealmSweptLayers !== 'object') {
+                this.data.mysticRealmSweptLayers = {};
+            }
+            if (this.data.endlessTrialMaxLayer === undefined || this.data.endlessTrialMaxLayer === null) {
+                this.data.endlessTrialMaxLayer = 0;
+            }
+            if (this.data.beastEvolutionStones === undefined || this.data.beastEvolutionStones === null) {
+                this.data.beastEvolutionStones = 0;
+            }
+            if (this.data.beastCultivationPills === undefined || this.data.beastCultivationPills === null) {
+                this.data.beastCultivationPills = 0;
             }
 
             return true;

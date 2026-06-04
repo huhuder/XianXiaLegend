@@ -1,6 +1,6 @@
 /* ================================================================
-   MysticRealm - 秘境系统
-   4种秘境类型、多层波次战斗、每日秘境令
+   MysticRealm - 秘境系统 v2
+   层数机制 + 扫荡 + 万兽荒原产出改造 + 无尽试炼
    ================================================================ */
 
 var MysticRealm = (function () {
@@ -11,12 +11,17 @@ var MysticRealm = (function () {
        =========================================== */
     var CONFIG = {
         dailyTokens: 5,
-        tokenCost: 100,          // 额外购买秘境令的灵石价格
-        maxExtraTokens: 10,      // 每日最多额外购买
-        refreshHour: 5,          // 每日刷新时间（UTC+8 凌晨5点）
+        tokenCost: 100,
+        maxExtraTokens: 10,
+        refreshHour: 5,
+        layersPerRealmIndex: 3,
+        maxLayers: 30,
+        sweepRate: 0.8,
     };
 
-    /* 秘境类型定义 */
+    /* ===========================================
+       秘境类型定义（4个常规 + 无尽试炼）
+       =========================================== */
     var REALMS = [
         {
             id: 'spirit_stone',
@@ -26,11 +31,10 @@ var MysticRealm = (function () {
             color: '#4ade80',
             lootType: 'spiritStones',
             lootRange: [50, 200],
-            waves: 3,
             enemies: [
-                { name: '矿脉守卫·石甲', hp: 80, atk: 12, def: 8, dropMultiplier: 1.0 },
-                { name: '矿脉统领·晶岩', hp: 150, atk: 18, def: 12, dropMultiplier: 1.5 },
-                { name: '矿脉之主·灵髓', hp: 260, atk: 25, def: 16, dropMultiplier: 2.0 },
+                { name: '矿脉守卫·石甲', hp: 80, atk: 12, def: 8, dropM: 1.0 },
+                { name: '矿脉统领·晶岩', hp: 150, atk: 18, def: 12, dropM: 1.5 },
+                { name: '矿脉之主·灵髓', hp: 260, atk: 25, def: 16, dropM: 2.0 },
             ],
             unlockStage: 1,
         },
@@ -42,12 +46,11 @@ var MysticRealm = (function () {
             color: '#f87171',
             lootType: 'equipment',
             lootTierRange: [1, 3],
-            waves: 4,
             enemies: [
-                { name: '熔岩卫士·赤火', hp: 100, atk: 15, def: 6, dropMultiplier: 1.0 },
-                { name: '锻造大师·铁砧', hp: 180, atk: 22, def: 14, dropMultiplier: 1.5 },
-                { name: '烈焰统领·锻魂', hp: 300, atk: 28, def: 10, dropMultiplier: 1.8 },
-                { name: '熔炉之主·天工', hp: 420, atk: 35, def: 18, dropMultiplier: 2.5 },
+                { name: '熔岩卫士·赤火', hp: 100, atk: 15, def: 6, dropM: 1.0 },
+                { name: '锻造大师·铁砧', hp: 180, atk: 22, def: 14, dropM: 1.5 },
+                { name: '烈焰统领·锻魂', hp: 300, atk: 28, def: 10, dropM: 1.8 },
+                { name: '熔炉之主·天工', hp: 420, atk: 35, def: 18, dropM: 2.5 },
             ],
             unlockStage: 2,
         },
@@ -59,32 +62,61 @@ var MysticRealm = (function () {
             color: '#a78bfa',
             lootType: 'skillBook',
             lootTierRange: [1, 3],
-            waves: 3,
             enemies: [
-                { name: '守殿弟子·剑影', hp: 120, atk: 14, def: 8, dropMultiplier: 1.0 },
-                { name: '内门长老·传功', hp: 220, atk: 20, def: 15, dropMultiplier: 1.6 },
-                { name: '殿主残魂·大能', hp: 350, atk: 30, def: 20, dropMultiplier: 2.2 },
+                { name: '守殿弟子·剑影', hp: 120, atk: 14, def: 8, dropM: 1.0 },
+                { name: '内门长老·传功', hp: 220, atk: 20, def: 15, dropM: 1.6 },
+                { name: '殿主残魂·大能', hp: 350, atk: 30, def: 20, dropM: 2.2 },
             ],
             unlockStage: 3,
         },
         {
             id: 'beast_wilds',
             name: '万兽荒原',
-            desc: '蛮荒妖兽盘踞之地，击败兽群可获得大量经验',
+            desc: '蛮荒妖兽盘踞之地，击败兽群可获得灵兽口粮与进化材料',
             icon: '🐉',
             color: '#fb923c',
-            lootType: 'exp',
-            lootRange: [80, 400],
-            waves: 5,
+            lootType: 'beastFood',
             enemies: [
-                { name: '荒原妖兽·铁牙', hp: 60, atk: 10, def: 4, dropMultiplier: 0.8 },
-                { name: '荒原妖兽·钢爪', hp: 80, atk: 13, def: 5, dropMultiplier: 1.0 },
-                { name: '兽群统领·金角', hp: 160, atk: 20, def: 10, dropMultiplier: 1.5 },
-                { name: '远古凶兽·裂地', hp: 280, atk: 26, def: 14, dropMultiplier: 2.0 },
-                { name: '荒原之主·万兽王', hp: 450, atk: 38, def: 22, dropMultiplier: 3.0 },
+                { name: '荒原妖兽·铁牙', hp: 60, atk: 10, def: 4, dropM: 0.8 },
+                { name: '荒原妖兽·钢爪', hp: 80, atk: 13, def: 5, dropM: 1.0 },
+                { name: '兽群统领·金角', hp: 160, atk: 20, def: 10, dropM: 1.5 },
+                { name: '远古凶兽·裂地', hp: 280, atk: 26, def: 14, dropM: 2.0 },
+                { name: '荒原之主·万兽王', hp: 450, atk: 38, def: 22, dropM: 3.0 },
             ],
             unlockStage: 4,
         },
+    ];
+
+    /* ===========================================
+       无尽试炼配置
+       =========================================== */
+    var ENDLESS_CONFIG = {
+        id: 'endless_trial',
+        name: '无尽试炼',
+        desc: '无尽深渊中的永恒战场，每5层BOSS战，每10层大BOSS',
+        icon: '🔥',
+        color: '#ffd700',
+        bgColor: '#0a0a0a',
+        borderColor: '#d4a017',
+        enemyBase: { hp: 80, atk: 10, def: 5 },
+        bossMultiplier: 2.5,
+        superBossMultiplier: 4.5,
+    };
+
+    /* ===========================================
+       试炼装备词条池
+       =========================================== */
+    var TRIAL_AFFIXES = [
+        { name: '破甲', desc: '无视20%防御', key: 'ignoreDef', value: 20 },
+        { name: '嗜血', desc: '攻击吸血+15%', key: 'lifesteal', value: 15 },
+        { name: '雷击', desc: '攻击附带雷击（30%攻击力）', key: 'lightningStrike', value: 30 },
+        { name: '火焰', desc: '攻击附带灼烧', key: 'burnDot', value: 10 },
+        { name: '冰霜', desc: '攻击减速敌人', key: 'slow', value: 1 },
+        { name: '连击', desc: '10%概率触发连击', key: 'doubleStrike', value: 10 },
+        { name: '不屈', desc: '生命低于30%时防御翻倍', key: 'lastStand', value: 100 },
+        { name: '致命', desc: '暴击伤害+50%', key: 'critDmg', value: 50 },
+        { name: '精准', desc: '暴击率+8%', key: 'critRate', value: 8 },
+        { name: '壁垒', desc: '受到伤害-15%', key: 'dmgReduction', value: 15 },
     ];
 
     /* ===========================================
@@ -95,12 +127,16 @@ var MysticRealm = (function () {
         extraBought: 0,
         lastRefreshDate: '',
         currentRealm: null,
+        currentLayer: 0,
         currentWave: 0,
         inBattle: false,
-        clearedRealms: [],  // 今日已通关的秘境ID
+        isEndless: false,
+        clearedRealms: [],
+        endlessWave: 0,
+        endlessEnemy: null,
+        endlessRewards: [],
     };
 
-    /* 引用外部模块 */
     var Game;
 
     /* ===========================================
@@ -114,7 +150,7 @@ var MysticRealm = (function () {
     }
 
     /* ===========================================
-       存档读写（从 Game.data 读写，迁移前兼容旧 localStorage）
+       存档读写
        =========================================== */
     function loadState() {
         if (Game && Game.data) {
@@ -123,7 +159,6 @@ var MysticRealm = (function () {
             state.lastRefreshDate = Game.data.mysticRealmLastRefreshDate;
             state.clearedRealms = Game.data.mysticRealmClearedRealms;
         } else {
-            // 回退：Game 未初始化时从 localStorage 读取
             try {
                 var raw = localStorage.getItem('mysticRealm');
                 if (raw) {
@@ -133,7 +168,7 @@ var MysticRealm = (function () {
                     state.lastRefreshDate = saved.lastRefreshDate || '';
                     state.clearedRealms = saved.clearedRealms || [];
                 }
-            } catch(e) {}
+            } catch (e) {}
         }
     }
 
@@ -144,7 +179,6 @@ var MysticRealm = (function () {
             Game.data.mysticRealmLastRefreshDate = state.lastRefreshDate;
             Game.data.mysticRealmClearedRealms = state.clearedRealms;
         }
-        // 保留旧 localStorage 作为备份（loadGame 会在迁移后清除）
         localStorage.setItem('mysticRealm', JSON.stringify({
             tokens: state.tokens,
             extraBought: state.extraBought,
@@ -161,11 +195,16 @@ var MysticRealm = (function () {
             state.lastRefreshDate = today;
             state.clearedRealms = [];
         }
+        if (Game && Game.data) {
+            if (Game.data.mysticRealmSweepDate !== today) {
+                Game.data.mysticRealmSweepDate = today;
+                Game.data.mysticRealmSweptLayers = {};
+            }
+        }
     }
 
     function getDateStr() {
         var d = new Date();
-        // UTC+8 daily refresh at 5am
         var h = d.getUTCHours() + 8;
         var date = new Date(d.getTime() + 8 * 3600000);
         if (h < CONFIG.refreshHour) {
@@ -177,7 +216,52 @@ var MysticRealm = (function () {
     }
 
     /* ===========================================
-       渲染
+       层数计算
+       =========================================== */
+    function getRealmMaxLayer(realmIndex) {
+        return Math.min((realmIndex + 1) * CONFIG.layersPerRealmIndex, CONFIG.maxLayers);
+    }
+
+    function getLayerDifficulty(layer) {
+        return layer % 3;
+    }
+
+    function getDifficultyName(layer) {
+        var d = getLayerDifficulty(layer);
+        return d === 0 ? '简单' : d === 1 ? '普通' : '困难';
+    }
+
+    function isLayerCleared(realmId, layer) {
+        if (!Game || !Game.data || !Game.data.mysticRealmClearedLayers) return false;
+        var layers = Game.data.mysticRealmClearedLayers[realmId];
+        return layers && layers.indexOf(layer) !== -1;
+    }
+
+    function markLayerCleared(realmId, layer) {
+        if (!Game || !Game.data) return;
+        if (!Game.data.mysticRealmClearedLayers) Game.data.mysticRealmClearedLayers = {};
+        if (!Game.data.mysticRealmClearedLayers[realmId]) Game.data.mysticRealmClearedLayers[realmId] = [];
+        var arr = Game.data.mysticRealmClearedLayers[realmId];
+        if (arr.indexOf(layer) === -1) arr.push(layer);
+    }
+
+    function isLayerSweptToday(realmId, layer) {
+        checkDailyRefresh();
+        if (!Game || !Game.data) return false;
+        var swept = Game.data.mysticRealmSweptLayers;
+        return swept && swept[realmId] && swept[realmId].indexOf(layer) !== -1;
+    }
+
+    function markLayerSwept(realmId, layer) {
+        if (!Game || !Game.data) return;
+        if (!Game.data.mysticRealmSweptLayers) Game.data.mysticRealmSweptLayers = {};
+        if (!Game.data.mysticRealmSweptLayers[realmId]) Game.data.mysticRealmSweptLayers[realmId] = [];
+        var arr = Game.data.mysticRealmSweptLayers[realmId];
+        if (arr.indexOf(layer) === -1) arr.push(layer);
+    }
+
+    /* ===========================================
+       渲染 - 秘境列表主页
        =========================================== */
     function render() {
         checkDailyRefresh();
@@ -196,17 +280,21 @@ var MysticRealm = (function () {
         }
         html += '</div></div>';
 
-        // 秘境列表
         var stage = Game ? Math.min(4, Math.floor(Game.data.realmIndex / 2) + 1) : 1;
+        var realmIndex = Game ? Game.data.realmIndex : 0;
+        var maxLayer = getRealmMaxLayer(realmIndex);
+
         html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
         for (var i = 0; i < REALMS.length; i++) {
             var r = REALMS[i];
             var unlocked = stage >= r.unlockStage;
-            var cleared = state.clearedRealms.indexOf(r.id) !== -1;
+            var clearedLayers = Game.data.mysticRealmClearedLayers ? (Game.data.mysticRealmClearedLayers[r.id] || []) : [];
+            var allCleared = unlocked && clearedLayers.length >= maxLayer && maxLayer > 0;
+            var hasCleared = unlocked && clearedLayers.length > 0;
 
-            html += '<div style="background:' + r.color + '18;border:1px solid ' + r.color + '44;border-radius:8px;padding:12px;';
+            html += '<div onclick="' + (unlocked ? 'MysticRealm.renderLayerSelect(\'' + r.id + '\')' : '') + '" style="cursor:' + (unlocked ? 'pointer' : 'default') + ';background:' + r.color + '18;border:1px solid ' + r.color + '44;border-radius:8px;padding:12px;transition:all 0.2s;';
             if (!unlocked) html += 'opacity:0.5;';
-            html += '">';
+            html += '" onmouseover="if(this.style.opacity!=\'0.5\')this.style.borderColor=\'' + r.color + '\';this.style.background=\'' + r.color + '28\';" onmouseout="if(this.style.opacity!=\'0.5\')this.style.borderColor=\'' + r.color + '44\';this.style.background=\'' + r.color + '18\';">';
             html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">';
             html += '<span style="font-size:20px;">' + r.icon + '</span>';
             html += '<span style="color:' + r.color + ';font-weight:bold;">' + r.name + '</span>';
@@ -214,16 +302,187 @@ var MysticRealm = (function () {
             html += '</div>';
             html += '<div style="color:#aaa;font-size:11px;margin-bottom:8px;">' + r.desc + '</div>';
             html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-            html += '<span style="color:#999;font-size:11px;">' + r.waves + '波战斗</span>';
-            if (!unlocked) {
-                html += '<button class="btn btn-sm" disabled style="opacity:0.4;">未解锁</button>';
-            } else if (cleared) {
-                html += '<span style="color:#4ade80;font-size:12px;">已通关</span>';
+
+            if (allCleared) {
+                html += '<span style="color:#4ade80;font-size:11px;">✅ 全部通关 (' + clearedLayers.length + '/' + maxLayer + '层)</span>';
+            } else if (hasCleared) {
+                html += '<span style="color:#fbbf24;font-size:11px;">已通关 ' + clearedLayers.length + '/' + maxLayer + ' 层</span>';
+            } else if (unlocked) {
+                html += '<span style="color:#a78bfa;font-size:11px;">共 ' + maxLayer + ' 层可挑战</span>';
             } else {
-                html += '<button class="btn btn-sm" onclick="MysticRealm.enterRealm(\'' + r.id + '\')" style="background:' + r.color + ';color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;">挑战</button>';
+                html += '<span style="color:#666;font-size:11px;">' + r.enemies.length + '波战斗</span>';
+            }
+
+            if (unlocked) {
+                html += '<span style="color:' + r.color + ';font-size:11px;">进入 ▶</span>';
+            } else {
+                html += '<span style="opacity:0.4;font-size:11px;">🔒</span>';
             }
             html += '</div></div>';
         }
+        html += '</div>';
+
+        // 无尽试炼
+        html += '<div style="margin-top:10px;">';
+        html += '<div onclick="MysticRealm.renderEndlessTrial()" style="cursor:pointer;background:linear-gradient(135deg,#0a0a0a,#1a1000);border:2px solid ' + ENDLESS_CONFIG.borderColor + ';border-radius:8px;padding:14px;position:relative;overflow:hidden;box-shadow:0 0 20px rgba(212,160,23,0.2);" onmouseover="this.style.boxShadow=\'0 0 30px rgba(212,160,23,0.4)\'" onmouseout="this.style.boxShadow=\'0 0 20px rgba(212,160,23,0.2)\'">';
+        html += '<div style="position:absolute;top:-2px;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,' + ENDLESS_CONFIG.borderColor + ',transparent);"></div>';
+        html += '<div style="position:absolute;bottom:-2px;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,' + ENDLESS_CONFIG.borderColor + ',transparent);"></div>';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;">';
+        html += '<div>';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">';
+        html += '<span style="font-size:24px;">' + ENDLESS_CONFIG.icon + '</span>';
+        html += '<span style="color:' + ENDLESS_CONFIG.color + ';font-weight:bold;font-size:16px;">' + ENDLESS_CONFIG.name + '</span>';
+        html += '</div>';
+        html += '<div style="color:#999;font-size:11px;">' + ENDLESS_CONFIG.desc + '</div>';
+        html += '</div>';
+        html += '<div style="text-align:right;">';
+        html += '<div style="color:#ffd700;font-size:12px;">最高 ' + (Game.data.endlessTrialMaxLayer || 0) + ' 层</div>';
+        html += '<div style="color:#f87171;font-size:14px;font-weight:bold;">挑战 ▶</div>';
+        html += '</div>';
+        html += '</div></div></div>';
+
+        container.innerHTML = html;
+    }
+
+    /* ===========================================
+       渲染 - 层数选择界面
+       =========================================== */
+    function renderLayerSelect(realmId) {
+        checkDailyRefresh();
+        var container = document.getElementById('realm-content');
+        if (!container) return;
+
+        var realm = null;
+        for (var i = 0; i < REALMS.length; i++) {
+            if (REALMS[i].id === realmId) { realm = REALMS[i]; break; }
+        }
+        if (!realm) { render(); return; }
+
+        var realmIndex = Game ? Game.data.realmIndex : 0;
+        var maxLayer = getRealmMaxLayer(realmIndex);
+
+        var html = '';
+
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">';
+        html += '<button class="btn btn-sm" onclick="MysticRealm.render()" style="background:#333;color:#ccc;border:none;border-radius:4px;padding:4px 10px;font-size:12px;">← 返回</button>';
+        html += '<span style="color:' + realm.color + ';font-size:16px;font-weight:bold;">' + realm.icon + ' ' + realm.name + '</span>';
+        html += '</div>';
+
+        html += '<div style="background:#1a1a2e;border-radius:6px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;font-size:12px;">';
+        html += '<span style="color:#a78bfa;">秘境令：<b>' + state.tokens + '</b></span>';
+        html += '<span style="color:#666;">当前境界可挑战 ' + maxLayer + ' 层</span>';
+        html += '</div>';
+
+        html += '<div style="max-height:400px;overflow-y:auto;padding-right:4px;">';
+
+        for (var layer = 0; layer < maxLayer; layer++) {
+            var cleared = isLayerCleared(realmId, layer);
+            var swept = isLayerSweptToday(realmId, layer);
+            var difficulty = getLayerDifficulty(layer);
+            var diffName = getDifficultyName(layer);
+            var diffColor = difficulty === 0 ? '#4ade80' : difficulty === 1 ? '#fbbf24' : '#f87171';
+            var canEnter = cleared || (layer === 0);
+            if (layer > 0 && !isLayerCleared(realmId, layer - 1)) canEnter = false;
+
+            var realmIndexOfLayer = Math.floor(layer / CONFIG.layersPerRealmIndex);
+            var layerInRealm = (layer % CONFIG.layersPerRealmIndex) + 1;
+            var borderColor = '#333';
+            var bgColor = '#1a1a2e';
+            if (cleared) {
+                borderColor = '#4ade80';
+                bgColor = '#0a2a1a';
+            } else if (canEnter) {
+                borderColor = realm.color;
+                bgColor = realm.color + '15';
+            } else {
+                bgColor = '#111';
+            }
+
+            html += '<div style="display:flex;align-items:center;background:' + bgColor + ';border:1px solid ' + borderColor + ';border-radius:6px;padding:8px 10px;margin-bottom:6px;';
+            if (!canEnter && !cleared) html += 'opacity:0.5;';
+            html += '">';
+
+            html += '<div style="flex:1;">';
+            html += '<div style="display:flex;align-items:center;gap:8px;">';
+            html += '<span style="color:#ffd700;font-size:12px;font-weight:bold;">第' + (layer + 1) + '层</span>';
+            if (cleared) {
+                html += '<span style="color:#4ade80;font-size:12px;">✅</span>';
+            } else if (!canEnter) {
+                html += '<span style="color:#666;font-size:12px;">🔒</span>';
+            }
+            html += '<span style="color:' + diffColor + ';font-size:11px;">' + diffName + '</span>';
+            html += '<span style="color:#666;font-size:10px;">境界' + (realmIndexOfLayer + 1) + '·第' + layerInRealm + '层</span>';
+            html += '</div>';
+            html += '</div>';
+
+            html += '<div style="display:flex;gap:6px;">';
+            if (cleared) {
+                if (swept) {
+                    html += '<button class="btn btn-sm" disabled style="background:#333;color:#666;border:none;border-radius:4px;padding:3px 8px;font-size:10px;">已扫荡</button>';
+                } else {
+                    html += '<button class="btn btn-sm" onclick="event.stopPropagation();MysticRealm.sweepLayer(\'' + realmId + '\',' + layer + ')" style="background:#06b6d4;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:10px;">扫荡</button>';
+                }
+                html += '<button class="btn btn-sm" onclick="event.stopPropagation();MysticRealm.enterLayer(\'' + realmId + '\',' + layer + ')" style="background:' + realm.color + ';color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:10px;">再战</button>';
+            } else if (canEnter) {
+                html += '<button class="btn btn-sm" onclick="event.stopPropagation();MysticRealm.enterLayer(\'' + realmId + '\',' + layer + ')" style="background:' + realm.color + ';color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:10px;">挑战</button>';
+            } else {
+                html += '<button class="btn btn-sm" disabled style="background:#222;color:#444;border:none;border-radius:4px;padding:3px 8px;font-size:10px;">锁定</button>';
+            }
+            html += '</div>';
+
+            html += '</div>';
+        }
+
+        html += '</div>';
+
+        container.innerHTML = html;
+    }
+
+    /* ===========================================
+       渲染 - 无尽试炼入口
+       =========================================== */
+    function renderEndlessTrial() {
+        checkDailyRefresh();
+        var container = document.getElementById('realm-content');
+        if (!container) return;
+
+        var maxLayer = Game.data.endlessTrialMaxLayer || 0;
+
+        var html = '';
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">';
+        html += '<button class="btn btn-sm" onclick="MysticRealm.render()" style="background:#333;color:#ccc;border:none;border-radius:4px;padding:4px 10px;font-size:12px;">← 返回</button>';
+        html += '<span style="color:' + ENDLESS_CONFIG.color + ';font-size:16px;font-weight:bold;">' + ENDLESS_CONFIG.icon + ' ' + ENDLESS_CONFIG.name + '</span>';
+        html += '</div>';
+
+        html += '<div style="background:linear-gradient(180deg,#0a0800,#1a1000,#0a0800);border:2px solid ' + ENDLESS_CONFIG.borderColor + ';border-radius:10px;padding:16px;box-shadow:0 0 30px rgba(212,160,23,0.15);">';
+
+        html += '<div style="text-align:center;margin-bottom:14px;">';
+        html += '<div style="font-size:36px;margin-bottom:6px;">🔥</div>';
+        html += '<div style="color:' + ENDLESS_CONFIG.color + ';font-size:18px;font-weight:bold;text-shadow:0 0 10px rgba(255,215,0,0.3);">无 尽 试 炼</div>';
+        html += '<div style="color:#999;font-size:11px;margin-top:4px;">挑战永无止境，每5层BOSS · 每10层大BOSS</div>';
+        html += '</div>';
+
+        html += '<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:10px;margin-bottom:12px;">';
+        html += '<div style="display:flex;justify-content:space-around;text-align:center;">';
+        html += '<div><div style="color:#ffd700;font-size:20px;font-weight:bold;">' + maxLayer + '</div><div style="color:#666;font-size:10px;">最高通关</div></div>';
+        html += '<div><div style="color:#a78bfa;font-size:20px;font-weight:bold;">' + state.tokens + '</div><div style="color:#666;font-size:10px;">秘境令</div></div>';
+        html += '</div></div>';
+
+        html += '<div style="color:#888;font-size:11px;line-height:1.6;margin-bottom:14px;">';
+        html += '<div>• 不限层数，从第1层持续挑战</div>';
+        html += '<div>• 每5层BOSS战（概率掉落<span style="color:#ffd700;">试炼武器</span>）</div>';
+        html += '<div>• 每10层大BOSS（概率掉落<span style="color:#c084fc;">试炼套装</span>）</div>';
+        html += '<div>• 装备品质随层数提升</div>';
+        html += '<div>• <span style="color:#f87171;">死亡或退出后结算奖励</span></div>';
+        html += '<div>• <span style="color:#f87171;">不产出灵兽口粮</span></div>';
+        html += '</div>';
+
+        if (state.tokens > 0) {
+            html += '<button class="btn" onclick="MysticRealm.startEndlessTrial()" style="width:100%;background:linear-gradient(135deg,#d4a017,#b8860b);color:#000;font-weight:bold;border:none;border-radius:8px;padding:12px;font-size:15px;">开始试炼（消耗1枚秘境令）</button>';
+        } else {
+            html += '<button class="btn" disabled style="width:100%;background:#333;color:#666;border:none;border-radius:8px;padding:12px;">秘境令不足</button>';
+        }
+
         html += '</div>';
 
         container.innerHTML = html;
@@ -253,9 +512,9 @@ var MysticRealm = (function () {
     }
 
     /* ===========================================
-       进入秘境
+       进入层（常规秘境）
        =========================================== */
-    function enterRealm(realmId) {
+    function enterLayer(realmId, layer) {
         checkDailyRefresh();
         if (state.tokens <= 0) {
             alert('秘境令不足');
@@ -271,13 +530,134 @@ var MysticRealm = (function () {
         }
         if (!realm) return;
 
+        if (layer > 0 && !isLayerCleared(realmId, layer - 1)) {
+            alert('请先通关第' + layer + '层');
+            return;
+        }
+
         state.tokens--;
         state.currentRealm = realm;
+        state.currentLayer = layer;
         state.currentWave = 0;
         state.inBattle = true;
+        state.isEndless = false;
         saveState();
 
         startWave();
+    }
+
+    /* ===========================================
+       扫荡
+       =========================================== */
+    function sweepLayer(realmId, layer) {
+        checkDailyRefresh();
+        if (!isLayerCleared(realmId, layer)) {
+            alert('该层尚未通关，无法扫荡');
+            return;
+        }
+        if (isLayerSweptToday(realmId, layer)) {
+            alert('今日已扫荡过该层');
+            return;
+        }
+        if (state.tokens <= 0) {
+            alert('秘境令不足');
+            return;
+        }
+
+        var realm = null;
+        for (var i = 0; i < REALMS.length; i++) {
+            if (REALMS[i].id === realmId) { realm = REALMS[i]; break; }
+        }
+        if (!realm) return;
+
+        state.tokens--;
+        saveState();
+
+        var playerLevel = Game ? (Game.data.level || 1) : 1;
+        var scaling = 1 + playerLevel * 0.08;
+        var layerScale = 1 + layer * 0.12;
+        var diffDifficulty = getLayerDifficulty(layer);
+        var diffMod = diffDifficulty === 0 ? 0.7 : diffDifficulty === 1 ? 1.0 : 1.4;
+        var totalMod = scaling * layerScale * diffMod * CONFIG.sweepRate;
+
+        var totalStones = 0, totalExp = 0, totalFood = 0, gotEquip = false, gotSkill = false;
+
+        for (var w = 0; w < realm.enemies.length; w++) {
+            var dropM = realm.enemies[w].dropM || 1.0;
+            var waveMod = totalMod * dropM;
+
+            totalStones += Math.floor((5 + Math.random() * 15) * waveMod);
+            totalExp += Math.floor((10 + Math.random() * 30) * waveMod);
+
+            switch (realm.lootType) {
+                case 'spiritStones':
+                    var range = realm.lootRange;
+                    totalStones += Math.floor((range[0] + Math.random() * (range[1] - range[0])) * waveMod);
+                    break;
+                case 'equipment':
+                    if (Math.random() < 0.4 * dropM) gotEquip = true;
+                    break;
+                case 'skillBook':
+                    if (Math.random() < 0.35 * dropM) gotSkill = true;
+                    break;
+                case 'beastFood':
+                    totalFood += Math.floor((2 + layer * 0.6 + Math.random() * 6) * dropM);
+                    if (layer >= 6 && Math.random() < 0.2 * dropM) {
+                        Game.data.beastEvolutionStones = (Game.data.beastEvolutionStones || 0) + 1;
+                    }
+                    if (layer >= 12 && Math.random() < 0.1 * dropM) {
+                        Game.data.beastCultivationPills = (Game.data.beastCultivationPills || 0) + 1;
+                    }
+                    break;
+            }
+        }
+
+        if (totalStones > 0) Game.addSpirit(totalStones);
+        if (totalExp > 0) Game.addExperience(totalExp);
+        if (totalFood > 0) {
+            Game.data.beastFood = (Game.data.beastFood || 0) + totalFood;
+        }
+        if (gotEquip && realm.lootTierRange) {
+            var eqTier = realm.lootTierRange[0] + Math.floor(Math.random() * (realm.lootTierRange[1] - realm.lootTierRange[0] + 1));
+            addRealmEquipment(eqTier);
+        }
+        if (gotSkill) {
+            Game.addSpirit(Math.floor((30 + Math.random() * 80) * totalMod));
+            Game.addExperience(Math.floor((30 + Math.random() * 80) * totalMod * 0.5));
+        }
+
+        markLayerSwept(realmId, layer);
+        renderLayerSelect(realmId);
+
+        showToast('扫荡完成！收益已折算（×80%）', 2000);
+    }
+
+    /* ===========================================
+       生成层敌人（动态缩放）
+       =========================================== */
+    function getLayerEnemies(realm, layer) {
+        var playerLevel = Game ? (Game.data.level || 1) : 1;
+        var scaling = 1 + playerLevel * 0.08;
+        var layerScale = 1 + layer * 0.12;
+        var diffDifficulty = getLayerDifficulty(layer);
+        var diffMod = diffDifficulty === 0 ? 0.7 : diffDifficulty === 1 ? 1.0 : 1.4;
+
+        var totalMod = scaling * layerScale * diffMod;
+
+        var enemies = [];
+        for (var i = 0; i < realm.enemies.length; i++) {
+            var base = realm.enemies[i];
+            enemies.push({
+                name: base.name + ' Lv.' + (layer + 1),
+                hp: Math.floor(base.hp * totalMod),
+                maxHp: Math.floor(base.hp * totalMod),
+                atk: Math.floor(base.atk * totalMod),
+                def: Math.floor(base.def * totalMod),
+                dropMultiplier: (base.dropM || 1.0) * diffMod,
+                xpBonus: Math.floor(10 * totalMod),
+            });
+        }
+        return enemies;
     }
 
     /* ===========================================
@@ -286,44 +666,32 @@ var MysticRealm = (function () {
     function startWave() {
         var realm = state.currentRealm;
         var waveIdx = state.currentWave;
-        if (waveIdx >= realm.enemies.length) {
-            // 所有波次完成
-            onRealmCleared();
+        var enemies = getLayerEnemies(realm, state.currentLayer);
+
+        if (waveIdx >= enemies.length) {
+            onLayerCleared();
             return;
         }
 
-        var enemy = realm.enemies[waveIdx];
-        var playerLevel = Game ? (Game.data.level || 1) : 1;
-        var scaling = 1 + playerLevel * 0.08;
-
-        // 构建敌人数据
-        var enemyData = {
-            name: enemy.name,
-            hp: Math.floor(enemy.hp * scaling),
-            maxHp: Math.floor(enemy.hp * scaling),
-            atk: Math.floor(enemy.atk * scaling),
-            def: Math.floor(enemy.def * scaling),
-            dropMultiplier: enemy.dropMultiplier,
-            xpBonus: Math.floor(10 * scaling),
-        };
-
-        showBattleUI(realm, waveIdx, enemyData);
+        var enemyData = enemies[waveIdx];
+        showBattleUI(realm, waveIdx, enemyData, enemies.length);
     }
 
     /* ===========================================
-       战斗UI显示
+       战斗UI
        =========================================== */
-    function showBattleUI(realm, waveIdx, enemyData) {
+    function showBattleUI(realm, waveIdx, enemyData, totalWaves) {
         var container = document.getElementById('realm-content');
         if (!container) return;
+
+        var diffName = getDifficultyName(state.currentLayer);
 
         var html = '';
         html += '<div style="text-align:center;margin-bottom:10px;">';
         html += '<div style="font-size:16px;color:' + realm.color + ';font-weight:bold;">' + realm.icon + ' ' + realm.name + '</div>';
-        html += '<div style="color:#ccc;font-size:12px;">第 ' + (waveIdx + 1) + '/' + realm.enemies.length + ' 波</div>';
+        html += '<div style="color:#ccc;font-size:12px;">第 ' + (state.currentLayer + 1) + ' 层（' + diffName + '） · 第 ' + (waveIdx + 1) + '/' + totalWaves + ' 波</div>';
         html += '</div>';
 
-        // 敌人信息
         html += '<div style="background:#1a1a2e;border:1px solid ' + realm.color + '55;border-radius:8px;padding:12px;text-align:center;margin-bottom:12px;">';
         html += '<div style="color:' + realm.color + ';font-size:14px;font-weight:bold;margin-bottom:6px;">' + enemyData.name + '</div>';
         html += '<div style="margin-bottom:6px;">';
@@ -336,23 +704,20 @@ var MysticRealm = (function () {
         html += '<span>攻击 ' + enemyData.atk + '</span><span>防御 ' + enemyData.def + '</span>';
         html += '</div></div>';
 
-        // 战斗按钮
         html += '<div style="display:flex;gap:8px;justify-content:center;">';
         html += '<button class="btn" onclick="MysticRealm.doAttack()" style="background:' + realm.color + ';color:#fff;border:none;border-radius:6px;padding:8px 20px;">攻击</button>';
         html += '<button class="btn" onclick="MysticRealm.fleeRealm()" style="background:#555;color:#fff;border:none;border-radius:6px;padding:8px 20px;">撤退</button>';
         html += '</div>';
 
-        // 战斗日志
         html += '<div id="realm-battle-log" style="margin-top:10px;max-height:120px;overflow-y:auto;color:#aaa;font-size:11px;"></div>';
 
         container.innerHTML = html;
-
-        // 存储当前敌人数据
         container.setAttribute('data-enemy', JSON.stringify(enemyData));
+        container.setAttribute('data-endless', '0');
     }
 
     /* ===========================================
-       攻击
+       攻击（通用 - 常规秘境 + 无尽试炼）
        =========================================== */
     function doAttack() {
         if (!state.inBattle || !Game) return;
@@ -364,14 +729,15 @@ var MysticRealm = (function () {
         if (!enemyStr) return;
         var enemyData = JSON.parse(enemyStr);
 
-        // 计算总攻击/防御/暴击率加成（宗门+天赋+套装）
+        var isEndless = container.getAttribute('data-endless') === '1';
+
+        // 攻击/防御加成计算
         var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { atkPct: 0, defPct: 0 };
         var activeBuffs = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0 };
         var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { atkPct: 0, defPct: 0, critRate: 0 };
         var totalAtkPct = sectBonus.atkPct + activeBuffs.atkPct + talentEff.atkPct;
         var totalDefPct = sectBonus.defPct + activeBuffs.defPct + talentEff.defPct;
 
-        // 套装加成
         if (typeof Equipment !== 'undefined') {
             var setBonuses = Equipment.getActiveSetBonuses();
             for (var si = 0; si < setBonuses.length; si++) {
@@ -386,14 +752,12 @@ var MysticRealm = (function () {
         var pHp = Game.data.hp || 100;
         var pMaxHp = Game.data.maxHp || 100;
 
-        // 灵兽出战加成（11-4批）
         if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
             var beastBonus = Beast.getActiveBeastBonus();
             pAtk += beastBonus.atk;
             pDef += beastBonus.def;
         }
 
-        // 动态暴击率：基础 + 装备效果 + 套装 + 天赋
         var totalCritRate = (Game.data.critRate || 0);
         var equipped = Game.data.equipped || [];
         for (var ei = 0; ei < equipped.length; ei++) {
@@ -424,7 +788,6 @@ var MysticRealm = (function () {
         if (crit) log += '<span style="color:#fbbf24;">暴击！</span>';
         log += '你攻击 ' + enemyData.name + ' 造成 <span style="color:#f87171;">' + pDmg + '</span> 点伤害</div>';
 
-        // 更新血条
         var hpBar = document.getElementById('realm-enemy-hp-bar');
         if (hpBar) {
             var pct = Math.max(0, enemyData.hp / enemyData.maxHp * 100);
@@ -441,21 +804,29 @@ var MysticRealm = (function () {
                 logEl.scrollTop = logEl.scrollHeight;
             }
 
-            // 给予奖励
-            giveWaveReward(enemyData);
-
-            // 恢复部分生命
-            Game.data.hp = Math.min(Game.data.hp + Math.floor(pMaxHp * 0.2), pMaxHp);
-
-            // 下一波
-            state.currentWave++;
-            var realm = state.currentRealm;
-            if (state.currentWave >= realm.enemies.length) {
-                onRealmCleared();
-            } else {
+            if (isEndless) {
+                // 无尽试炼：奖励 + 下一波
+                giveEndlessWaveReward(state.endlessWave, enemyData.isBoss, enemyData.isSuperBoss);
+                Game.data.hp = Math.min(Game.data.hp + Math.floor(pMaxHp * (enemyData.isSuperBoss ? 0.5 : enemyData.isBoss ? 0.35 : 0.2)), pMaxHp);
+                if (state.endlessWave > (Game.data.endlessTrialMaxLayer || 0)) {
+                    Game.data.endlessTrialMaxLayer = state.endlessWave;
+                }
+                state.endlessWave++;
                 setTimeout(function () {
-                    startWave();
+                    startEndlessWave();
                 }, 800);
+            } else {
+                // 常规秘境
+                giveWaveReward(enemyData);
+                Game.data.hp = Math.min(Game.data.hp + Math.floor(pMaxHp * 0.2), pMaxHp);
+                state.currentWave++;
+                if (state.currentWave >= getLayerEnemies(state.currentRealm, state.currentLayer).length) {
+                    onLayerCleared();
+                } else {
+                    setTimeout(function () {
+                        startWave();
+                    }, 800);
+                }
             }
             return;
         }
@@ -466,14 +837,17 @@ var MysticRealm = (function () {
 
         log += '<div>' + enemyData.name + ' 反击造成 <span style="color:#f87171;">' + eDmg + '</span> 点伤害</div>';
 
-        // 检查玩家死亡
         if (Game.data.hp <= 0) {
-            log += '<div style="color:#f87171;">你被击败了！秘境探索失败。</div>';
+            log += '<div style="color:#f87171;">你被击败了！</div>';
             if (logEl) {
                 logEl.innerHTML += log;
                 logEl.scrollTop = logEl.scrollHeight;
             }
-            onRealmFailed();
+            if (isEndless) {
+                onEndlessDeath();
+            } else {
+                onRealmFailed();
+            }
             return;
         }
 
@@ -482,18 +856,18 @@ var MysticRealm = (function () {
             logEl.scrollTop = logEl.scrollHeight;
         }
 
-        // 更新存储
         container.setAttribute('data-enemy', JSON.stringify(enemyData));
     }
 
     /* ===========================================
-       波次奖励
+       波次奖励（常规秘境）
        =========================================== */
     function giveWaveReward(enemyData) {
         var realm = state.currentRealm;
         if (!realm || !Game) return;
 
         var mul = enemyData.dropMultiplier || 1.0;
+        var layer = state.currentLayer;
 
         switch (realm.lootType) {
             case 'spiritStones':
@@ -501,39 +875,165 @@ var MysticRealm = (function () {
                 var stones = Math.floor((range[0] + Math.random() * (range[1] - range[0])) * mul);
                 Game.addSpirit(stones);
                 break;
-            case 'exp':
-                var expRange = realm.lootRange;
-                var exp = Math.floor((expRange[0] + Math.random() * (expRange[1] - expRange[0])) * mul);
-                Game.addExperience(exp);
-                break;
             case 'equipment':
-                // 掉落装备 - 概率触发
                 if (Math.random() < 0.4 * mul) {
                     var eqTier = realm.lootTierRange[0] + Math.floor(Math.random() * (realm.lootTierRange[1] - realm.lootTierRange[0] + 1));
                     addRealmEquipment(eqTier);
                 }
                 break;
             case 'skillBook':
-                // 掉落技能书（以灵石+经验折算）
                 if (Math.random() < 0.35 * mul) {
                     var sBonus = Math.floor((30 + Math.random() * 80) * mul);
                     Game.addSpirit(sBonus);
                     Game.addExperience(Math.floor(sBonus * 0.5));
                 }
                 break;
+            case 'beastFood':
+                var food = Math.floor((2 + layer * 0.6 + Math.random() * 6) * mul);
+                Game.data.beastFood = (Game.data.beastFood || 0) + food;
+                if (layer >= 6 && Math.random() < 0.2 * mul) {
+                    Game.data.beastEvolutionStones = (Game.data.beastEvolutionStones || 0) + 1;
+                }
+                if (layer >= 12 && Math.random() < 0.1 * mul) {
+                    Game.data.beastCultivationPills = (Game.data.beastCultivationPills || 0) + 1;
+                }
+                break;
         }
 
-        // 基础灵石和经验
         var baseStones = Math.floor((5 + Math.random() * 15) * mul);
         var baseExp = Math.floor((10 + Math.random() * 30) * mul);
         Game.addSpirit(baseStones);
         Game.addExperience(baseExp);
     }
 
-    /* 添加秘境掉落装备 */
+    /* ===========================================
+       无尽试炼波次奖励
+       =========================================== */
+    function giveEndlessWaveReward(waveNum, isBoss, isSuperBoss) {
+        if (!Game) return;
+
+        var mul = 1 + waveNum * 0.08;
+
+        var stones = Math.floor((30 + waveNum * 10 + Math.random() * waveNum * 15) * mul);
+        Game.addSpirit(stones);
+        state.endlessRewards.push({ type: '灵石', value: stones });
+
+        var exp = Math.floor((20 + waveNum * 8 + Math.random() * waveNum * 10) * mul);
+        Game.addExperience(exp);
+        state.endlessRewards.push({ type: '经验', value: exp });
+
+        var eqTier = 1;
+        if (waveNum >= 20) eqTier = 3;
+        else if (waveNum >= 10) eqTier = 2;
+
+        if (isBoss) {
+            if (Math.random() < 0.4) {
+                addTrialWeapon(waveNum);
+                state.endlessRewards.push({ type: '试炼武器', value: 1 });
+            }
+        }
+        if (isSuperBoss) {
+            if (Math.random() < 0.35) {
+                addTrialSetPiece(waveNum);
+                state.endlessRewards.push({ type: '试炼套装', value: 1 });
+            }
+        }
+
+        if (Math.random() < 0.3 * mul) {
+            addRealmEquipment(eqTier);
+            state.endlessRewards.push({ type: '装备', value: 1 });
+        }
+    }
+
+    /* ===========================================
+       试炼武器
+       =========================================== */
+    function addTrialWeapon(waveNum) {
+        if (!Game) return;
+        var affix = TRIAL_AFFIXES[Math.floor(Math.random() * TRIAL_AFFIXES.length)];
+        var names = ['深渊', '炼狱', '破晓', '暗影', '天罚', '寂灭', '混沌', '永劫'];
+        var name = names[Math.floor(Math.random() * names.length)] + '之刃';
+        var tier = waveNum >= 20 ? 3 : waveNum >= 10 ? 2 : 1;
+        var qualityIndex = tier - 1 + (Math.random() < 0.3 ? 1 : 0);
+        if (qualityIndex > 3) qualityIndex = 3;
+        var multVals = [1.0, 1.5, 2.0, 3.0];
+        var mult = multVals[qualityIndex] || 1.0;
+        var qualityNames = ['凡品', '灵品', '仙品', '神品'];
+        var baseAtk = Math.floor((waveNum * 4 + Math.random() * waveNum * 3) * mult);
+
+        var eq = {
+            id: Date.now() + '_' + Math.floor(Math.random() * 10000),
+            name: qualityNames[qualityIndex] + ' · ' + name + '（深渊）',
+            quality: qualityIndex,
+            slot: 0,
+            baseAtk: baseAtk,
+            baseDef: Math.floor(baseAtk * 0.2),
+            baseHp: Math.floor(baseAtk * 2),
+            atk: baseAtk,
+            def: Math.floor(baseAtk * 0.2),
+            hp: Math.floor(baseAtk * 2),
+            enhance: 0,
+            tier: tier,
+            mapIndex: tier - 1,
+            effects: [{ name: affix.name, key: affix.key, value: affix.value }],
+            setName: null,
+            setSlotName: null,
+            isTrial: true,
+        };
+
+        Game.data.inventory.push(eq);
+    }
+
+    /* ===========================================
+       试炼套装部件
+       =========================================== */
+    function addTrialSetPiece(waveNum) {
+        if (!Game) return;
+        var slots = [1, 2, 3, 4, 5];
+        var slot = slots[Math.floor(Math.random() * slots.length)];
+        var slotNames = ['甲', '盔', '戒', '坠', '带'];
+        var slotIdx = slot === 1 ? 0 : slot === 2 ? 1 : slot === 3 ? 2 : slot === 4 ? 3 : 4;
+
+        var tier = waveNum >= 20 ? 3 : waveNum >= 10 ? 2 : 1;
+        var qualityIndex = tier - 1 + (Math.random() < 0.3 ? 1 : 0);
+        if (qualityIndex > 3) qualityIndex = 3;
+        var multVals = [1.0, 1.5, 2.0, 3.0];
+        var mult = multVals[qualityIndex] || 1.0;
+        var qualityNames = ['凡品', '灵品', '仙品', '神品'];
+
+        var baseAtk = Math.floor((waveNum * 2 + Math.random() * waveNum) * mult);
+        var baseDef = Math.floor((waveNum * 3 + Math.random() * waveNum * 2) * mult);
+        var baseHp = Math.floor((waveNum * 8 + Math.random() * waveNum * 5) * mult);
+
+        var affix = TRIAL_AFFIXES[Math.floor(Math.random() * TRIAL_AFFIXES.length)];
+
+        var eq = {
+            id: Date.now() + '_' + Math.floor(Math.random() * 10000),
+            name: qualityNames[qualityIndex] + ' · 试炼' + slotNames[slotIdx] + '（深渊）',
+            quality: qualityIndex,
+            slot: slot,
+            baseAtk: baseAtk,
+            baseDef: baseDef,
+            baseHp: baseHp,
+            atk: baseAtk,
+            def: baseDef,
+            hp: baseHp,
+            enhance: 0,
+            tier: tier,
+            mapIndex: tier - 1,
+            effects: [{ name: affix.name, key: affix.key, value: affix.value }],
+            setName: '试炼套装',
+            setSlotName: slotNames[slotIdx],
+            isTrial: true,
+        };
+
+        Game.data.inventory.push(eq);
+    }
+
+    /* ===========================================
+       添加秘境掉落装备
+       =========================================== */
     function addRealmEquipment(tier) {
-        // 兼容 Equipment.js 标准装备结构
-        // tier: 1=凡品(quality 0-1), 2=灵品(quality 1-2), 3=仙品(quality 2-3)
         var slotNames = ['weapon', 'armor', 'helmet', 'ring', 'amulet', 'belt'];
         var slotIndex = Math.floor(Math.random() * 6);
         var tierNames = { 1: '凡品', 2: '灵品', 3: '仙品' };
@@ -544,7 +1044,8 @@ var MysticRealm = (function () {
                            tier === 2 ? 1 + Math.floor(Math.random() * 2) :
                            2 + Math.floor(Math.random() * 2);
 
-        var mult = [1.0, 1.5, 2.0, 3.0][qualityIndex] || 1.0;
+        var multVals = [1.0, 1.5, 2.0, 3.0];
+        var mult = multVals[qualityIndex] || 1.0;
         var baseAtk = Math.floor((tier * 3 + Math.random() * tier * 5) * mult);
         var baseDef = Math.floor((tier * 2 + Math.random() * tier * 3) * mult);
         var baseHp  = Math.floor((tier * 10 + Math.random() * tier * 10) * mult);
@@ -580,37 +1081,44 @@ var MysticRealm = (function () {
     }
 
     /* ===========================================
-       秘境通关
+       层通关（常规秘境）
        =========================================== */
-    function onRealmCleared() {
+    function onLayerCleared() {
         var realm = state.currentRealm;
+        var layer = state.currentLayer;
         state.inBattle = false;
         state.clearedRealms.push(realm.id);
         saveState();
 
-        // 通关额外奖励
-        if (Game) {
-            var bonusStones = 100 + Math.floor(Math.random() * 200);
-            var bonusExp = 50 + Math.floor(Math.random() * 150);
-            Game.addSpirit(bonusStones);
-            Game.addExperience(bonusExp);
+        var isFirstClear = !isLayerCleared(realm.id, layer);
+        if (isFirstClear) {
+            markLayerCleared(realm.id, layer);
+            var firstBonus = 100 + layer * 50 + Math.floor(Math.random() * layer * 30);
+            Game.addSpirit(firstBonus);
+            if (realm.lootType !== 'beastFood') {
+                Game.addExperience(Math.floor(firstBonus * 0.6));
+            }
         }
 
         var container = document.getElementById('realm-content');
         if (container) {
+            var diffName = getDifficultyName(layer);
             var html = '';
             html += '<div style="text-align:center;padding:20px;">';
             html += '<div style="font-size:40px;margin-bottom:10px;">🎉</div>';
-            html += '<div style="color:' + realm.color + ';font-size:18px;font-weight:bold;margin-bottom:6px;">' + realm.name + ' 通关！</div>';
-            html += '<div style="color:#aaa;font-size:12px;margin-bottom:16px;">所有波次已击破，获得额外奖励</div>';
-            html += '<button class="btn" onclick="MysticRealm.render()" style="background:#4ade80;color:#000;border:none;border-radius:6px;padding:8px 20px;">返回秘境列表</button>';
+            html += '<div style="color:' + realm.color + ';font-size:18px;font-weight:bold;margin-bottom:6px;">' + realm.name + ' 第' + (layer + 1) + '层 通关！</div>';
+            html += '<div style="color:#aaa;font-size:12px;margin-bottom:4px;">难度：' + diffName + '</div>';
+            if (isFirstClear) {
+                html += '<div style="color:#ffd700;font-size:12px;margin-bottom:12px;">首通奖励已领取！</div>';
+            }
+            html += '<button class="btn" onclick="MysticRealm.renderLayerSelect(\'' + realm.id + '\')" style="background:#4ade80;color:#000;border:none;border-radius:6px;padding:8px 20px;">返回层数选择</button>';
             html += '</div>';
             container.innerHTML = html;
         }
     }
 
     /* ===========================================
-       秘境失败
+       常规秘境失败
        =========================================== */
     function onRealmFailed() {
         state.inBattle = false;
@@ -618,12 +1126,13 @@ var MysticRealm = (function () {
 
         var container = document.getElementById('realm-content');
         if (container) {
+            var realm = state.currentRealm;
             var html = '';
             html += '<div style="text-align:center;padding:20px;">';
             html += '<div style="font-size:40px;margin-bottom:10px;">💀</div>';
             html += '<div style="color:#f87171;font-size:16px;font-weight:bold;margin-bottom:6px;">探索失败</div>';
             html += '<div style="color:#aaa;font-size:12px;margin-bottom:16px;">你被击败了，部分奖励已获取</div>';
-            html += '<button class="btn" onclick="MysticRealm.render()" style="background:#f87171;color:#fff;border:none;border-radius:6px;padding:8px 20px;">返回秘境列表</button>';
+            html += '<button class="btn" onclick="MysticRealm.renderLayerSelect(\'' + (realm ? realm.id : '') + '\')" style="background:#f87171;color:#fff;border:none;border-radius:6px;padding:8px 20px;">返回层数选择</button>';
             html += '</div>';
             container.innerHTML = html;
         }
@@ -634,29 +1143,262 @@ var MysticRealm = (function () {
        =========================================== */
     function fleeRealm() {
         state.inBattle = false;
+        state.isEndless = false;
         state.tokens++;
         saveState();
         showToast('已撤退，返还1枚秘境令', 2000);
-        render();
+        if (state.currentRealm && !state.isEndless) {
+            renderLayerSelect(state.currentRealm.id);
+        } else {
+            render();
+        }
+    }
+
+    /* ===================== 无尽试炼 ===================== */
+
+    /* ===========================================
+       开始无尽试炼
+       =========================================== */
+    function startEndlessTrial() {
+        checkDailyRefresh();
+        if (state.tokens <= 0) {
+            alert('秘境令不足');
+            return;
+        }
+        if (state.inBattle) {
+            alert('正在战斗中');
+            return;
+        }
+
+        state.tokens--;
+        state.inBattle = true;
+        state.isEndless = true;
+        state.endlessWave = 1;
+        state.endlessRewards = [];
+        saveState();
+
+        startEndlessWave();
     }
 
     /* ===========================================
-       获取秘境令数量（供外部查询）
+       无尽试炼：开始一波
+       =========================================== */
+    function startEndlessWave() {
+        var waveNum = state.endlessWave;
+        var isBoss = (waveNum % 5 === 0);
+        var isSuperBoss = (waveNum % 10 === 0);
+
+        var playerLevel = Game ? (Game.data.level || 1) : 1;
+        var scaling = 1 + playerLevel * 0.08;
+        var waveScale = 1 + waveNum * 0.1;
+
+        var enemyBase = ENDLESS_CONFIG.enemyBase;
+        var totalMod = scaling * waveScale;
+
+        var enemyData = {
+            name: '',
+            hp: 0,
+            maxHp: 0,
+            atk: 0,
+            def: 0,
+            isBoss: isBoss,
+            isSuperBoss: isSuperBoss,
+            waveNum: waveNum,
+        };
+
+        if (isSuperBoss) {
+            var bMult = ENDLESS_CONFIG.superBossMultiplier;
+            enemyData.name = '深渊之主 · 第' + waveNum + '层';
+            enemyData.hp = Math.floor(enemyBase.hp * totalMod * bMult);
+            enemyData.maxHp = enemyData.hp;
+            enemyData.atk = Math.floor(enemyBase.atk * totalMod * bMult * 0.7);
+            enemyData.def = Math.floor(enemyBase.def * totalMod * bMult * 0.6);
+        } else if (isBoss) {
+            var bossMult = ENDLESS_CONFIG.bossMultiplier;
+            enemyData.name = '深渊守卫 · 第' + waveNum + '层';
+            enemyData.hp = Math.floor(enemyBase.hp * totalMod * bossMult);
+            enemyData.maxHp = enemyData.hp;
+            enemyData.atk = Math.floor(enemyBase.atk * totalMod * bossMult * 0.7);
+            enemyData.def = Math.floor(enemyBase.def * totalMod * bossMult * 0.6);
+        } else {
+            var names = ['深渊游魂', '暗影魔兵', '虚空行者', '炼狱之牙', '混沌仆从', '深渊爪牙', '裂隙鬼卒'];
+            enemyData.name = names[waveNum % names.length] + ' · 第' + waveNum + '层';
+            enemyData.hp = Math.floor(enemyBase.hp * totalMod);
+            enemyData.maxHp = enemyData.hp;
+            enemyData.atk = Math.floor(enemyBase.atk * totalMod);
+            enemyData.def = Math.floor(enemyBase.def * totalMod);
+        }
+
+        state.endlessEnemy = enemyData;
+        showEndlessBattleUI(enemyData);
+    }
+
+    /* ===========================================
+       无尽试炼战斗UI
+       =========================================== */
+    function showEndlessBattleUI(enemyData) {
+        var container = document.getElementById('realm-content');
+        if (!container) return;
+
+        var waveNum = enemyData.waveNum;
+        var borderColor = enemyData.isSuperBoss ? '#c084fc' : enemyData.isBoss ? '#ffd700' : ENDLESS_CONFIG.borderColor;
+        var titleColor = enemyData.isSuperBoss ? '#c084fc' : enemyData.isBoss ? '#ffd700' : '#f87171';
+
+        var html = '';
+        html += '<div style="background:linear-gradient(180deg,#0a0800,#1a1000,#0a0800);border:2px solid ' + borderColor + ';border-radius:10px;padding:16px;box-shadow:0 0 20px rgba(212,160,23,0.15);">';
+
+        html += '<div style="text-align:center;margin-bottom:10px;">';
+        html += '<div style="color:#ffd700;font-size:16px;font-weight:bold;">' + ENDLESS_CONFIG.icon + ' 无尽试炼 · 第' + waveNum + '层</div>';
+        if (enemyData.isSuperBoss) {
+            html += '<div style="color:#c084fc;font-size:12px;margin-top:2px;">⚡ 大BOSS · 属性大幅跃升 ⚡</div>';
+        } else if (enemyData.isBoss) {
+            html += '<div style="color:#ffd700;font-size:12px;margin-top:2px;">👑 BOSS 战</div>';
+        }
+        html += '</div>';
+
+        html += '<div style="background:#111;border:1px solid ' + borderColor + '55;border-radius:8px;padding:12px;text-align:center;margin-bottom:12px;">';
+        html += '<div style="color:' + titleColor + ';font-size:14px;font-weight:bold;margin-bottom:6px;">' + enemyData.name + '</div>';
+        html += '<div style="margin-bottom:6px;">';
+        html += '<div style="background:#222;border-radius:4px;height:8px;overflow:hidden;">';
+        html += '<div id="realm-enemy-hp-bar" style="background:' + titleColor + ';height:100%;width:100%;transition:width 0.3s;"></div>';
+        html += '</div>';
+        html += '<div style="color:#aaa;font-size:11px;margin-top:2px;">HP ' + enemyData.hp + '/' + enemyData.maxHp + '</div>';
+        html += '</div>';
+        html += '<div style="display:flex;justify-content:center;gap:20px;color:#999;font-size:11px;">';
+        html += '<span>攻击 ' + enemyData.atk + '</span><span>防御 ' + enemyData.def + '</span>';
+        html += '</div></div>';
+
+        html += '<div style="display:flex;gap:8px;justify-content:center;">';
+        html += '<button class="btn" onclick="MysticRealm.doAttack()" style="background:linear-gradient(135deg,#d4a017,#b8860b);color:#000;font-weight:bold;border:none;border-radius:6px;padding:8px 20px;">攻击</button>';
+        html += '<button class="btn" onclick="MysticRealm.exitEndlessTrial()" style="background:#555;color:#fff;border:none;border-radius:6px;padding:8px 20px;">退出并结算</button>';
+        html += '</div>';
+
+        html += '<div id="realm-battle-log" style="margin-top:10px;max-height:120px;overflow-y:auto;color:#aaa;font-size:11px;"></div>';
+        html += '</div>';
+
+        container.innerHTML = html;
+        container.setAttribute('data-enemy', JSON.stringify(enemyData));
+        container.setAttribute('data-endless', '1');
+    }
+
+    /* ===========================================
+       无尽试炼死亡
+       =========================================== */
+    function onEndlessDeath() {
+        state.inBattle = false;
+        state.isEndless = false;
+        var finalWave = state.endlessWave;
+        var maxLayer = Game.data.endlessTrialMaxLayer || 0;
+        saveState();
+
+        var container = document.getElementById('realm-content');
+        if (container) {
+            var rewards = state.endlessRewards;
+            var totalStones = 0, totalExp = 0, trialWeapons = 0, trialSets = 0, equipments = 0;
+            for (var i = 0; i < rewards.length; i++) {
+                var r = rewards[i];
+                if (r.type === '灵石') totalStones += r.value;
+                else if (r.type === '经验') totalExp += r.value;
+                else if (r.type === '试炼武器') trialWeapons++;
+                else if (r.type === '试炼套装') trialSets++;
+                else if (r.type === '装备') equipments++;
+            }
+
+            var html = '';
+            html += '<div style="background:linear-gradient(180deg,#0a0800,#1a1000,#0a0800);border:2px solid ' + ENDLESS_CONFIG.borderColor + ';border-radius:10px;padding:16px;text-align:center;">';
+            html += '<div style="font-size:40px;margin-bottom:10px;">💀</div>';
+            html += '<div style="color:#f87171;font-size:18px;font-weight:bold;margin-bottom:6px;">试炼终结</div>';
+            html += '<div style="color:#ffd700;font-size:14px;margin-bottom:4px;">达到第 <b>' + finalWave + '</b> 层</div>';
+            html += '<div style="color:#999;font-size:11px;margin-bottom:4px;">历史最高：' + maxLayer + ' 层</div>';
+
+            html += '<div style="margin-top:12px;background:rgba(255,255,255,0.03);border-radius:6px;padding:10px;text-align:left;font-size:11px;">';
+            html += '<div style="color:#ccc;font-weight:bold;margin-bottom:6px;">结算奖励：</div>';
+            html += '<div style="color:#a78bfa;">灵石 +' + totalStones + '</div>';
+            html += '<div style="color:#4ade80;">经验 +' + totalExp + '</div>';
+            if (trialWeapons > 0) html += '<div style="color:#ffd700;">试炼武器 ×' + trialWeapons + '</div>';
+            if (trialSets > 0) html += '<div style="color:#c084fc;">试炼套装部件 ×' + trialSets + '</div>';
+            if (equipments > 0) html += '<div style="color:#fff;">普通装备 ×' + equipments + '</div>';
+            html += '</div>';
+
+            html += '<button class="btn" onclick="MysticRealm.render()" style="margin-top:12px;background:#d4a017;color:#000;font-weight:bold;border:none;border-radius:6px;padding:8px 20px;">返回秘境列表</button>';
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+    }
+
+    /* ===========================================
+       无尽试炼退出
+       =========================================== */
+    function exitEndlessTrial() {
+        state.inBattle = false;
+        state.isEndless = false;
+        var finalWave = state.endlessWave - 1;
+        if (finalWave < 1) finalWave = 0;
+        if (finalWave > (Game.data.endlessTrialMaxLayer || 0)) {
+            Game.data.endlessTrialMaxLayer = finalWave;
+        }
+        saveState();
+
+        var container = document.getElementById('realm-content');
+        if (container) {
+            var rewards = state.endlessRewards;
+            var totalStones = 0, totalExp = 0, trialWeapons = 0, trialSets = 0, equipments = 0;
+            for (var i = 0; i < rewards.length; i++) {
+                var r = rewards[i];
+                if (r.type === '灵石') totalStones += r.value;
+                else if (r.type === '经验') totalExp += r.value;
+                else if (r.type === '试炼武器') trialWeapons++;
+                else if (r.type === '试炼套装') trialSets++;
+                else if (r.type === '装备') equipments++;
+            }
+
+            var html = '';
+            html += '<div style="background:linear-gradient(180deg,#0a0800,#1a1000,#0a0800);border:2px solid ' + ENDLESS_CONFIG.borderColor + ';border-radius:10px;padding:16px;text-align:center;">';
+            html += '<div style="font-size:40px;margin-bottom:10px;">🏁</div>';
+            html += '<div style="color:#ffd700;font-size:18px;font-weight:bold;margin-bottom:6px;">已退出试炼</div>';
+            html += '<div style="color:#ffd700;font-size:14px;margin-bottom:4px;">达到第 <b>' + finalWave + '</b> 层</div>';
+
+            html += '<div style="margin-top:12px;background:rgba(255,255,255,0.03);border-radius:6px;padding:10px;text-align:left;font-size:11px;">';
+            html += '<div style="color:#ccc;font-weight:bold;margin-bottom:6px;">结算奖励：</div>';
+            html += '<div style="color:#a78bfa;">灵石 +' + totalStones + '</div>';
+            html += '<div style="color:#4ade80;">经验 +' + totalExp + '</div>';
+            if (trialWeapons > 0) html += '<div style="color:#ffd700;">试炼武器 ×' + trialWeapons + '</div>';
+            if (trialSets > 0) html += '<div style="color:#c084fc;">试炼套装部件 ×' + trialSets + '</div>';
+            if (equipments > 0) html += '<div style="color:#fff;">普通装备 ×' + equipments + '</div>';
+            html += '</div>';
+
+            html += '<button class="btn" onclick="MysticRealm.render()" style="margin-top:12px;background:#d4a017;color:#000;font-weight:bold;border:none;border-radius:6px;padding:8px 20px;">返回秘境列表</button>';
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+    }
+
+    /* ===========================================
+       获取秘境令
        =========================================== */
     function getTokens() {
         checkDailyRefresh();
         return state.tokens;
     }
 
-    // 公开API
+    /* ===========================================
+       公开API
+       =========================================== */
     return {
         init: init,
         render: render,
-        enterRealm: enterRealm,
+        renderLayerSelect: renderLayerSelect,
+        renderEndlessTrial: renderEndlessTrial,
+        enterLayer: enterLayer,
+        sweepLayer: sweepLayer,
         doAttack: doAttack,
         fleeRealm: fleeRealm,
         buyToken: buyToken,
         getTokens: getTokens,
+        startEndlessTrial: startEndlessTrial,
+        exitEndlessTrial: exitEndlessTrial,
     };
 
 })();
