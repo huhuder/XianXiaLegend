@@ -460,10 +460,19 @@ var WorldBoss = {
         this.battleBossHp = bd.hp;
         this.battleTotalDamage = 0;
 
-        // 玩家战斗HP（含宗门Buff加成）
+        // 玩家战斗HP（含宗门Buff + 天赋 + 套装加成）
         var sectBonus = typeof Sect !== 'undefined' ? Sect.getSectBonus() : { hpPct: 0, atkPct: 0, defPct: 0 };
         var activeBuffs = typeof Sect !== 'undefined' ? Sect.getActiveBuffs() : { hpPct: 0, atkPct: 0, defPct: 0 };
-        var hpMult = 1 + (sectBonus.hpPct + activeBuffs.hpPct) / 100;
+        var talentEff = typeof Talents !== 'undefined' ? Talents.getEffects() : { hpPct: 0, atkPct: 0, defPct: 0 };
+        var totalHpPct = sectBonus.hpPct + activeBuffs.hpPct + talentEff.hpPct;
+        // 套装hpPct加成
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses = Equipment.getActiveSetBonuses();
+            for (var _si = 0; _si < setBonuses.length; _si++) {
+                if (setBonuses[_si].effects.hpPct) totalHpPct += setBonuses[_si].effects.hpPct;
+            }
+        }
+        var hpMult = 1 + totalHpPct / 100;
         this.battlePlayerHp = Math.floor(Game.data.hp * hpMult);
         this.battlePlayerMaxHp = this.battlePlayerHp;
 
@@ -543,12 +552,14 @@ var WorldBoss = {
         var boss = this.battleBoss;
         var d = Game.data;
 
-        // 计算玩家属性（含宗门Buff + activeBuffs + 天赋 + 套装）
+        // 计算玩家属性（含宗门Buff + activeBuffs + 天赋 + 套装 + 技能Buff）
         var sectBonus = typeof Sect !== 'undefined' ? Sect.getSectBonus() : { atkPct: 0, defPct: 0 };
         var activeBuffs = typeof Sect !== 'undefined' ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0 };
         var talentEff = typeof Talents !== 'undefined' ? Talents.getEffects() : { atkPct: 0, defPct: 0, critRate: 0 };
-        var totalAtkPct = sectBonus.atkPct + activeBuffs.atkPct + talentEff.atkPct;
-        var totalDefPct = sectBonus.defPct + activeBuffs.defPct + talentEff.defPct;
+        var skillAtkBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_atk') : 0;
+        var skillAllBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_all') : 0;
+        var totalAtkPct = sectBonus.atkPct + activeBuffs.atkPct + talentEff.atkPct + skillAtkBuff + skillAllBuff;
+        var totalDefPct = sectBonus.defPct + activeBuffs.defPct + talentEff.defPct + skillAllBuff;
 
         // 套装加成
         if (typeof Equipment !== 'undefined') {
@@ -591,6 +602,11 @@ var WorldBoss = {
             }
         }
         totalCritRate += talentEff.critRate / 100;
+        // 灵兽暴击率加成
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var beastCritRate = Beast.getActiveBeastBonus().critRate || 0;
+            if (beastCritRate > 0) totalCritRate += beastCritRate / 100;
+        }
 
         // 玩家伤害：max(1, 玩家ATK * (0.8~1.2随机) - BossDEF * 0.3)，暴击1.5倍
         var playerRaw = playerAtk * (0.8 + Math.random() * 0.4);
@@ -601,6 +617,13 @@ var WorldBoss = {
         // Boss伤害：max(1, BossATK * (0.8~1.2随机) - 玩家DEF * 0.4)
         var bossRaw = boss.atk * (0.8 + Math.random() * 0.4);
         var bossDmg = Math.max(1, Math.floor(bossRaw - playerDef * 0.4));
+
+        // 技能护盾吸收
+        if (Game.data.skillShield && Game.data.skillShield > 0) {
+            var absorbed = Math.min(Game.data.skillShield, bossDmg);
+            Game.data.skillShield -= absorbed;
+            bossDmg -= absorbed;
+        }
 
         // 应用伤害
         this.battleBossHp = Math.max(0, this.battleBossHp - playerDmg);

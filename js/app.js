@@ -322,19 +322,53 @@ var Game = {
     calcPower: function () {
         var d = this.data;
 
-        // 基础属性战力
-        var power = d.attack * 2.5 + d.defense * 1.8 + d.hp * 0.5;
+        // 获取百分比加成来源
+        var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { atkPct: 0, defPct: 0, hpPct: 0 };
+        var activeBuffs = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0, hpPct: 0 };
+        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { atkPct: 0, defPct: 0, hpPct: 0, critRate: 0 };
 
-        // 使用统一聚合函数获取装备+套装效果
+        var totalAtkPct = sectBonus.atkPct + activeBuffs.atkPct + talentEff.atkPct;
+        var totalDefPct = sectBonus.defPct + activeBuffs.defPct + talentEff.defPct;
+        var totalHpPct = sectBonus.hpPct + activeBuffs.hpPct + talentEff.hpPct;
+
+        // 套装百分比加成
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses = Equipment.getActiveSetBonuses();
+            for (var si = 0; si < setBonuses.length; si++) {
+                var se = setBonuses[si].effects;
+                if (se.atkPct) totalAtkPct += se.atkPct;
+                if (se.defPct) totalDefPct += se.defPct;
+                if (se.hpPct) totalHpPct += se.hpPct;
+            }
+        }
+
+        // 灵兽固定值加成
+        var beastAtk = 0, beastDef = 0, beastHp = 0, beastCritRate = 0;
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var bb = Beast.getActiveBeastBonus();
+            beastAtk = bb.atk || 0;
+            beastDef = bb.def || 0;
+            beastHp = bb.hp || 0;
+            beastCritRate = bb.critRate || 0;
+        }
+
+        // 有效属性（基础 × 百分比 + 灵兽固定值）
+        var effectiveAtk = Math.floor(d.attack * (1 + totalAtkPct / 100)) + beastAtk;
+        var effectiveDef = Math.floor(d.defense * (1 + totalDefPct / 100)) + beastDef;
+        var effectiveHp = Math.floor(d.hp * (1 + totalHpPct / 100)) + beastHp;
+
+        // 基础战力
+        var power = effectiveAtk * 2.5 + effectiveDef * 1.8 + effectiveHp * 0.5;
+
+        // 装备特殊效果
         var eff = Equipment.getTotalEquipEffects();
-
-        var totalCritRate = (d.critRate || 0.05) * 100 + eff.critRate;
+        var totalCritRate = (d.critRate || 0.05) * 100 + eff.critRate + talentEff.critRate + beastCritRate;
         var totalDodgeRate = eff.dodgeRate;
         var totalLifesteal = eff.lifesteal;
 
         power += totalCritRate * 30 + totalDodgeRate * 20 + totalLifesteal * 15;
 
-        // 飞升加成
+        // 飞升倍率加成
         power *= Ascension.getAscensionMultiplier();
 
         return Math.floor(power);

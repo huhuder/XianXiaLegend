@@ -707,12 +707,15 @@ var MysticRealm = (function () {
 
         var isEndless = container.getAttribute('data-endless') === '1';
 
-        // 攻击/防御加成计算
-        var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { atkPct: 0, defPct: 0 };
-        var activeBuffs = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0 };
-        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { atkPct: 0, defPct: 0, critRate: 0 };
-        var totalAtkPct = sectBonus.atkPct + activeBuffs.atkPct + talentEff.atkPct;
-        var totalDefPct = sectBonus.defPct + activeBuffs.defPct + talentEff.defPct;
+        // 攻击/防御/生命加成计算
+        var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { atkPct: 0, defPct: 0, hpPct: 0 };
+        var activeBuffs = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0, hpPct: 0 };
+        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { atkPct: 0, defPct: 0, hpPct: 0, critRate: 0 };
+        var skillAtkBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_atk') : 0;
+        var skillAllBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_all') : 0;
+        var totalAtkPct = sectBonus.atkPct + activeBuffs.atkPct + talentEff.atkPct + skillAtkBuff + skillAllBuff;
+        var totalDefPct = sectBonus.defPct + activeBuffs.defPct + talentEff.defPct + skillAllBuff;
+        var totalHpPct = sectBonus.hpPct + activeBuffs.hpPct + talentEff.hpPct + skillAllBuff;
 
         if (typeof Equipment !== 'undefined') {
             var setBonuses = Equipment.getActiveSetBonuses();
@@ -720,6 +723,7 @@ var MysticRealm = (function () {
                 var se = setBonuses[si].effects;
                 if (se.atkPct) totalAtkPct += se.atkPct;
                 if (se.defPct) totalDefPct += se.defPct;
+                if (se.hpPct) totalHpPct += se.hpPct;
             }
         }
 
@@ -751,6 +755,11 @@ var MysticRealm = (function () {
             }
         }
         if (typeof Talents !== 'undefined') totalCritRate += Talents.getEffects().critRate / 100;
+        // 灵兽暴击率加成
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var beastCritRate = Beast.getActiveBeastBonus().critRate || 0;
+            if (beastCritRate > 0) totalCritRate += beastCritRate / 100;
+        }
 
         // 玩家攻击
         var pDmg = Math.max(1, pAtk - enemyData.def * 0.5 + Math.floor(Math.random() * 6));
@@ -809,6 +818,17 @@ var MysticRealm = (function () {
 
         // 敌人反击
         var eDmg = Math.max(1, enemyData.atk - pDef * 0.4 + Math.floor(Math.random() * 4));
+
+        // 技能护盾吸收
+        if (Game.data.skillShield && Game.data.skillShield > 0) {
+            var absorbed = Math.min(Game.data.skillShield, eDmg);
+            Game.data.skillShield -= absorbed;
+            eDmg -= absorbed;
+            if (absorbed > 0) {
+                log += '<div style="color:#38bdf8;">护盾吸收 ' + absorbed + ' 点伤害</div>';
+            }
+        }
+
         Game.data.hp = Math.max(0, Game.data.hp - eDmg);
 
         log += '<div>' + enemyData.name + ' 反击造成 <span style="color:#f87171;">' + eDmg + '</span> 点伤害</div>';

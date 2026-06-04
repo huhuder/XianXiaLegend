@@ -81,10 +81,18 @@ var Ascension = {
         this.tribulationTick = 0;
         this.totalDamage = 0;
 
-        // 玩家HP（含宗门加成）
+        // 玩家HP（含宗门+天赋+套装加成）
         var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { hpPct: 0 };
         var buffBonus = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { hpPct: 0 };
-        this.playerHp = Math.floor(Game.data.hp * (1 + sectBonus.hpPct / 100 + buffBonus.hpPct / 100));
+        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { hpPct: 0 };
+        var totalHpPct = sectBonus.hpPct + buffBonus.hpPct + talentEff.hpPct;
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses = Equipment.getActiveSetBonuses();
+            for (var _si = 0; _si < setBonuses.length; _si++) {
+                if (setBonuses[_si].effects.hpPct) totalHpPct += setBonuses[_si].effects.hpPct;
+            }
+        }
+        this.playerHp = Math.floor(Game.data.hp * (1 + totalHpPct / 100));
 
         // Boss HP
         this.bossMaxHp = trib.hp;
@@ -220,12 +228,14 @@ var Ascension = {
         var trib = TRIBULATIONS[this.currentWave];
         var d = Game.data;
 
-        // 玩家属性（含宗门+天赋+套装加成）
+        // 玩家属性（含宗门+天赋+套装+技能Buff加成）
         var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { atkPct: 0, defPct: 0, hpPct: 0 };
         var buffBonus = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0, hpPct: 0 };
-        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { atkPct: 0, defPct: 0, critRate: 0 };
-        var totalAtkPct = sectBonus.atkPct + buffBonus.atkPct + talentEff.atkPct;
-        var totalDefPct = sectBonus.defPct + buffBonus.defPct + talentEff.defPct;
+        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { atkPct: 0, defPct: 0, hpPct: 0, critRate: 0 };
+        var skillAtkBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_atk') : 0;
+        var skillAllBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_all') : 0;
+        var totalAtkPct = sectBonus.atkPct + buffBonus.atkPct + talentEff.atkPct + skillAtkBuff + skillAllBuff;
+        var totalDefPct = sectBonus.defPct + buffBonus.defPct + talentEff.defPct + skillAllBuff;
 
         // 套装加成
         if (typeof Equipment !== 'undefined') {
@@ -265,6 +275,11 @@ var Ascension = {
             }
         }
         totalCritRate += talentEff.critRate / 100;
+        // 灵兽暴击率加成
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var beastCritRate = Beast.getActiveBeastBonus().critRate || 0;
+            if (beastCritRate > 0) totalCritRate += beastCritRate / 100;
+        }
 
         // 玩家攻击天劫
         var baseDmg = effectiveAtk * random(0.8, 1.2);
@@ -295,6 +310,17 @@ var Ascension = {
         // 天劫攻击玩家
         var bossRaw = trib.atk * random(0.9, 1.1);
         var bossDmg = Math.max(1, Math.floor(bossRaw - effectiveDef * 0.3));
+
+        // 技能护盾吸收
+        if (Game.data.skillShield && Game.data.skillShield > 0) {
+            var absorbed = Math.min(Game.data.skillShield, bossDmg);
+            Game.data.skillShield -= absorbed;
+            bossDmg -= absorbed;
+            if (absorbed > 0) {
+                this.addTribLog('护盾吸收 ' + absorbed + ' 点伤害', '#38bdf8');
+            }
+        }
+
         this.playerHp -= bossDmg;
 
         this.addTribLog(trib.name + '攻击，你受到 ' + formatNumber(bossDmg) + ' 点伤害', '#ff6666');

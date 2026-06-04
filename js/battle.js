@@ -409,6 +409,18 @@ var Battle = {
         var totalAtkPct = sectBonus.atkPct + buffBonus.atkPct + talentEff.atkPct + skillAtkBuff + skillAllBuff;
         var totalDefPct = sectBonus.defPct + buffBonus.defPct + talentEff.defPct + skillAllBuff;
         var totalHpPct = sectBonus.hpPct + buffBonus.hpPct + talentEff.hpPct + skillAllBuff;
+
+        // 套装加成（atkPct/defPct/hpPct — 青龙/玄武/朱雀/白虎各套）
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses = Equipment.getActiveSetBonuses();
+            for (var _si = 0; _si < setBonuses.length; _si++) {
+                var _se = setBonuses[_si].effects;
+                if (_se.atkPct) totalAtkPct += _se.atkPct;
+                if (_se.defPct) totalDefPct += _se.defPct;
+                if (_se.hpPct) totalHpPct += _se.hpPct;
+            }
+        }
+
         var effectiveAtk = Math.floor(Game.data.attack * (1 + totalAtkPct / 100));
         var effectiveDef = Math.floor(Game.data.defense * (1 + totalDefPct / 100));
         var effectiveHp = Math.floor(Game.data.hp * (1 + totalHpPct / 100));
@@ -569,6 +581,11 @@ var Battle = {
         // ========== 普攻 ==========
         var baseDmg = effectiveAtk * random(0.8, 1.2);
         var totalCritRate = (Game.data.critRate || 0.05) + effects.critRate / 100 + talentEff.critRate / 100;
+        // 灵兽暴击率加成
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var beastCritRate = Beast.getActiveBeastBonus().critRate || 0;
+            if (beastCritRate > 0) totalCritRate += beastCritRate / 100;
+        }
         var skillCritDmgBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('crit_dmg_buff') : 0;
         var critMultiplier = 1.5 + talentEff.critDmg / 100 + skillCritDmgBuff / 100;
         var isCrit = Math.random() < totalCritRate;

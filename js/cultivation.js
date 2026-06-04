@@ -235,18 +235,69 @@ var Cultivation = {
         }
     },
 
-    /** 更新属性面板 */
+    /** 计算有效属性（含所有加成来源，与各战斗函数逻辑一致）
+     *  @returns {{ atk: number, def: number, hp: number, critRate: number }}
+     */
+    getEffectiveStats: function () {
+        var d = Game.data;
+        var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus) ? Sect.getSectBonus() : { atkPct: 0, defPct: 0, hpPct: 0 };
+        var activeBuffs = (typeof Sect !== 'undefined' && Sect.getActiveBuffs) ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0, hpPct: 0 };
+        var talentEff = (typeof Talents !== 'undefined') ? Talents.getEffects() : { atkPct: 0, defPct: 0, hpPct: 0, critRate: 0 };
+
+        var totalAtkPct = sectBonus.atkPct + activeBuffs.atkPct + talentEff.atkPct;
+        var totalDefPct = sectBonus.defPct + activeBuffs.defPct + talentEff.defPct;
+        var totalHpPct = sectBonus.hpPct + activeBuffs.hpPct + talentEff.hpPct;
+
+        if (typeof Equipment !== 'undefined') {
+            var setBonuses = Equipment.getActiveSetBonuses();
+            for (var si = 0; si < setBonuses.length; si++) {
+                var se = setBonuses[si].effects;
+                if (se.atkPct) totalAtkPct += se.atkPct;
+                if (se.defPct) totalDefPct += se.defPct;
+                if (se.hpPct) totalHpPct += se.hpPct;
+            }
+        }
+
+        var beastAtk = 0, beastDef = 0, beastHp = 0, beastCrit = 0;
+        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
+            var bb = Beast.getActiveBeastBonus();
+            beastAtk = bb.atk || 0;
+            beastDef = bb.def || 0;
+            beastHp = bb.hp || 0;
+            beastCrit = bb.critRate || 0;
+        }
+
+        // 暴击率：基础 + 装备 + 套装 + 天赋 + 灵兽
+        var critRate = (d.critRate || 0.05);
+        if (typeof Equipment !== 'undefined') {
+            var eff2 = Equipment.getTotalEquipEffects();
+            critRate += (eff2.critRate || 0) / 100;
+        }
+        critRate += talentEff.critRate / 100 + beastCrit / 100;
+
+        return {
+            atk: Math.floor(d.attack * (1 + totalAtkPct / 100)) + beastAtk,
+            def: Math.floor(d.defense * (1 + totalDefPct / 100)) + beastDef,
+            hp: Math.floor(d.hp * (1 + totalHpPct / 100)) + beastHp,
+            critRate: critRate
+        };
+    },
+
+    /** 更新属性面板 — 显示有效属性（含所有来源加成） */
     updateStatsPanel: function () {
         Game.dom.statLevel.textContent = calcLevel(Game.data.realmIndex, Game.data.layer);
-        Game.dom.statHp.textContent = Game.data.hp.toLocaleString();
-        Game.dom.statAtk.textContent = Game.data.attack.toLocaleString();
-        Game.dom.statDef.textContent = Game.data.defense.toLocaleString();
-        Game.dom.statCrit.textContent = getTotalCritRate() + '%';
 
-        var maxVal = Math.max(Game.data.hp, Game.data.attack * 3, Game.data.defense * 5, 1);
-        Game.dom.hpBar.style.width = Math.min(100, (Game.data.hp / maxVal) * 100) + '%';
-        Game.dom.atkBar.style.width = Math.min(100, (Game.data.attack * 3 / maxVal) * 100) + '%';
-        Game.dom.defBar.style.width = Math.min(100, (Game.data.defense * 5 / maxVal) * 100) + '%';
+        // 计算有效属性（含所有加成来源，与战斗逻辑一致）
+        var eff = this.getEffectiveStats();
+        Game.dom.statHp.textContent = eff.hp.toLocaleString();
+        Game.dom.statAtk.textContent = eff.atk.toLocaleString();
+        Game.dom.statDef.textContent = eff.def.toLocaleString();
+        Game.dom.statCrit.textContent = (eff.critRate * 100).toFixed(1) + '%';
+
+        var maxVal = Math.max(eff.hp, eff.atk * 3, eff.def * 5, 1);
+        Game.dom.hpBar.style.width = Math.min(100, (eff.hp / maxVal) * 100) + '%';
+        Game.dom.atkBar.style.width = Math.min(100, (eff.atk * 3 / maxVal) * 100) + '%';
+        Game.dom.defBar.style.width = Math.min(100, (eff.def * 5 / maxVal) * 100) + '%';
 
         // 详细附加属性 — 如果有装备效果则显示入口
         this.toggleDetailSection();
@@ -358,6 +409,10 @@ var Cultivation = {
             if (equipOnly < 0) equipOnly = 0;
 
             var total = a.base + equipVal;
+            // 灵兽暴击率加成并入总值
+            if (a.key === 'critRate' && beastBonus && beastBonus.critRate > 0) {
+                total += beastBonus.critRate;
+            }
 
             if (total > 0 || a.key === 'critRate') {
                 html += '<tr>' +
