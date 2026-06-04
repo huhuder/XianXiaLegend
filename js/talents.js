@@ -233,52 +233,64 @@ var Talents = {
             '<span class="talents-points-value">' + available + '</span>' +
             '</div>';
 
-        // 三维天赋树
+        // 三维子Tab切换
         var keys = ['sword', 'body', 'qi'];
+        var activeTree = this._activeTree || 'sword';
+        html += '<div class="talent-sub-tabs">';
         for (var i = 0; i < keys.length; i++) {
             var tree = this.TREES[keys[i]];
             var lv = this.getLevel(keys[i]);
-            var maxLv = 10;
-
-            html += '<div class="talent-tree-card" style="border-color:' + tree.color + '">' +
-                '<div class="talent-tree-header" style="color:' + tree.color + '">' +
-                tree.icon + ' ' + tree.name + ' <span class="talent-tree-level">Lv.' + lv + '/' + maxLv + '</span>' +
-                '</div>' +
-                '<div class="talent-tree-desc">' + tree.desc + '</div>';
-
-            // 层级列表
-            html += '<div class="talent-levels">';
-            for (var j = 0; j < maxLv; j++) {
-                var levelDef = tree.levels[j];
-                var unlocked = lv > j;
-                var isCurrent = lv === j; // 当前是下一级待解锁
-
-                var cls = 'talent-node';
-                if (unlocked) cls += ' unlocked';
-                if (isCurrent) cls += ' current';
-                if (!unlocked && !isCurrent) cls += ' locked';
-
-                html += '<div class="' + cls + '" style="border-color:' + tree.color + '">' +
-                    '<div class="talent-node-num">' + (j + 1) + '</div>' +
-                    '<div class="talent-node-info">' +
-                    '<div class="talent-node-name">' + levelDef.name + '</div>' +
-                    '<div class="talent-node-effect">' + levelDef.short + '</div>' +
-                    '</div>';
-
-                if (isCurrent && lv < maxLv) {
-                    html += '<button class="talent-upgrade-btn" style="background:' + tree.color + '"' +
-                        ' onclick="Talents.upgrade(\'' + keys[i] + '\');Talents.render();Game.updatePower();Cultivation.updateAllUI();"' +
-                        '>' + levelDef.cost + ' 点</button>';
-                } else if (unlocked) {
-                    html += '<span class="talent-check">✓</span>';
-                } else {
-                    html += '<span class="talent-cost-locked">' + levelDef.cost + '</span>';
-                }
-
-                html += '</div>';
-            }
-            html += '</div></div>';
+            var isActive = keys[i] === activeTree;
+            html += '<button class="talent-sub-tab-btn' + (isActive ? ' active' : '') + '"' +
+                ' data-tree="' + keys[i] + '"' +
+                ' style="' + (isActive ? 'border-color:' + tree.color + ';color:' + tree.color : '') + '"' +
+                '>' + tree.icon + ' ' + tree.name + ' Lv.' + lv + '/10</button>';
         }
+        html += '</div>';
+
+        // 只渲染当前激活的天赋树
+        var tree = this.TREES[activeTree];
+        var lv = this.getLevel(activeTree);
+        var maxLv = 10;
+
+        html += '<div class="talent-tree-card" style="border-color:' + tree.color + '">' +
+            '<div class="talent-tree-header" style="color:' + tree.color + '">' +
+            tree.icon + ' ' + tree.name + ' <span class="talent-tree-level">Lv.' + lv + '/' + maxLv + '</span>' +
+            '</div>' +
+            '<div class="talent-tree-desc">' + tree.desc + '</div>';
+
+        // 层级列表
+        html += '<div class="talent-levels">';
+        for (var j = 0; j < maxLv; j++) {
+            var levelDef = tree.levels[j];
+            var unlocked = lv > j;
+            var isCurrent = lv === j;
+
+            var cls = 'talent-node';
+            if (unlocked) cls += ' unlocked';
+            if (isCurrent) cls += ' current';
+            if (!unlocked && !isCurrent) cls += ' locked';
+
+            html += '<div class="' + cls + '" style="border-color:' + tree.color + '">' +
+                '<div class="talent-node-num">' + (j + 1) + '</div>' +
+                '<div class="talent-node-info">' +
+                '<div class="talent-node-name">' + levelDef.name + '</div>' +
+                '<div class="talent-node-effect">' + levelDef.short + '</div>' +
+                '</div>';
+
+            if (isCurrent && lv < maxLv) {
+                html += '<button class="talent-upgrade-btn" style="background:' + tree.color + '"' +
+                    ' onclick="Talents.upgrade(\'' + activeTree + '\');Talents.render();Game.updatePower();Cultivation.updateAllUI();"' +
+                    '>' + levelDef.cost + ' 点</button>';
+            } else if (unlocked) {
+                html += '<span class="talent-check">✓</span>';
+            } else {
+                html += '<span class="talent-cost-locked">' + levelDef.cost + '</span>';
+            }
+
+            html += '</div>';
+        }
+        html += '</div></div>';
 
         // 满级提示
         if (this.getLevel('sword') === 10 && this.getLevel('body') === 10 && this.getLevel('qi') === 10) {
@@ -286,6 +298,16 @@ var Talents = {
         }
 
         container.innerHTML = html;
+
+        // 绑定子Tab事件
+        var self = this;
+        var subBtns = container.querySelectorAll('.talent-sub-tab-btn');
+        for (var k = 0; k < subBtns.length; k++) {
+            subBtns[k].addEventListener('click', function () {
+                self._activeTree = this.getAttribute('data-tree');
+                self.render();
+            });
+        }
     }
 
 };
