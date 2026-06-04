@@ -1111,21 +1111,23 @@ var Equipment = {
        ---------------------------------------------------------- */
     init: function () {
         var self = this;
-        // 子Tab按钮事件
-        var subBtns = document.querySelectorAll('.sub-tab-btn');
+        var charTab = document.getElementById('tab-character');
+        if (!charTab) return;
+        // 子Tab按钮事件（限角色Tab内）
+        var subBtns = charTab.querySelectorAll('.sub-tab-btn');
         for (var i = 0; i < subBtns.length; i++) {
             subBtns[i].addEventListener('click', function () {
                 var sub = this.getAttribute('data-sub');
 
                 // 切换按钮高亮
-                var allBtns = document.querySelectorAll('.sub-tab-btn');
+                var allBtns = charTab.querySelectorAll('.sub-tab-btn');
                 for (var b = 0; b < allBtns.length; b++) {
                     allBtns[b].classList.remove('active');
                 }
                 this.classList.add('active');
 
                 // 切换子页面
-                var allPages = document.querySelectorAll('.sub-page');
+                var allPages = charTab.querySelectorAll('.sub-page');
                 for (var p = 0; p < allPages.length; p++) {
                     allPages[p].classList.remove('active');
                 }

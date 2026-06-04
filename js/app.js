@@ -236,6 +236,7 @@ var Game = {
         if (tabName === 'world') {
             if (!this._worldInit) {
                 WorldBoss.init();
+                this._initWorldSubTabs();
                 this._worldInit = true;
             }
             WorldBoss.renderWorldPage();
@@ -492,6 +493,38 @@ var Game = {
         if (this.timers.autoSave) {
             clearInterval(this.timers.autoSave);
             this.timers.autoSave = null;
+        }
+    },
+
+    /* ----------------------------------------------------------
+       初始化世界Tab子Tab切换
+       ---------------------------------------------------------- */
+    _initWorldSubTabs: function () {
+        var worldTab = document.getElementById('tab-world');
+        if (!worldTab) return;
+        var subBtns = worldTab.querySelectorAll('.sub-tab-btn');
+        for (var i = 0; i < subBtns.length; i++) {
+            subBtns[i].addEventListener('click', function () {
+                var sub = this.getAttribute('data-sub');
+                // 切换按钮高亮
+                var allBtns = worldTab.querySelectorAll('.sub-tab-btn');
+                for (var b = 0; b < allBtns.length; b++) {
+                    allBtns[b].classList.remove('active');
+                }
+                this.classList.add('active');
+                // 切换子页面
+                var allPages = worldTab.querySelectorAll('.sub-page');
+                for (var p = 0; p < allPages.length; p++) {
+                    allPages[p].classList.remove('active');
+                }
+                var target = document.getElementById('sub-' + sub);
+                if (target) target.classList.add('active');
+
+                // 切换到秘境时懒加载
+                if (sub === 'realm' && typeof MysticRealm !== 'undefined') {
+                    MysticRealm.render();
+                }
+            });
         }
     },
 
