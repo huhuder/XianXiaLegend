@@ -163,6 +163,20 @@ var Battle = {
             leaveBtn.onclick = function () { self.stopAFK(); };
         }
 
+        // 绑定秘境快捷入口
+        var realmQuickBtn = document.getElementById('battle-realm-quick-btn');
+        if (realmQuickBtn) {
+            realmQuickBtn.onclick = function () {
+                self.stopAFK();
+                Game.switchTab('world');
+                // 切换到秘境子Tab
+                setTimeout(function () {
+                    var realmSubBtn = document.querySelector('#tab-world .sub-tab-btn[data-sub="realm"]');
+                    if (realmSubBtn) realmSubBtn.click();
+                }, 100);
+            };
+        }
+
         // 立即刷第一只怪
         this.spawnMonster();
     },
@@ -949,10 +963,17 @@ var Battle = {
         entry.textContent = message;
         log.appendChild(entry);
 
+        // 重要事件视觉强调：暴击/技能/BOSS击杀 加闪动
+        if (color === '#ff2222' || color === '#ff4444' || color === '#ffd700') {
+            entry.style.fontWeight = 'bold';
+            entry.style.textShadow = '0 0 6px ' + color;
+        }
+
         this.logCount++;
-        if (this.logCount > 8) {
+        if (this.logCount > 12) {
             var first = log.firstElementChild;
             if (first) first.remove();
+            this.logCount = 11;
         }
         log.scrollTop = log.scrollHeight;
     },

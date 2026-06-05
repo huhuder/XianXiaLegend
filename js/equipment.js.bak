@@ -562,17 +562,8 @@ var Equipment = {
         setTimeout(removeFn, 2000);
     },
 
-    /** 筛选按钮样式 */
-    _btnStyle: function (isActive, color) {
-        return 'padding:3px 8px;border-radius:12px;font-size:10px;cursor:pointer;' +
-            'border:1px solid ' + (isActive ? color : '#444') + ';' +
-            'background:' + (isActive ? color + '33' : 'rgba(0,0,0,0.3)') + ';' +
-            'color:' + (isActive ? '#fff' : '#888') + ';' +
-            'font-family:inherit;transition:all 0.15s;';
-    },
-
     /* ----------------------------------------------------------
-       渲染背包列表（加入品质筛选和批量出售）
+       渲染背包列表
        ---------------------------------------------------------- */
     renderInventory: function () {
         var container = document.getElementById('inventory-list');
@@ -587,90 +578,6 @@ var Equipment = {
             return;
         }
 
-        // 过滤品质（当前筛选，默认显示全部）
-        var filterQuality = this._invFilter || -1;  // -1 表示全部
-
-        // 筛选按钮行
-        var filterRow = document.createElement('div');
-        filterRow.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;align-items:center;';
-        filterRow.innerHTML = '<span style="font-size:11px;color:var(--text-muted);margin-right:4px;">筛选:</span>';
-
-        var self = this;
-        // "全部"按钮
-        var allBtn = document.createElement('button');
-        allBtn.textContent = '全部(' + inventory.length + ')';
-        allBtn.style.cssText = this._btnStyle(filterQuality === -1, '#888');
-        allBtn.addEventListener('click', function () { self._invFilter = -1; self.renderInventory(); });
-        filterRow.appendChild(allBtn);
-
-        for (var qi = 0; qi < this.QUALITIES.length; qi++) {
-            (function (qIdx) {
-                var q = self.QUALITIES[qIdx];
-                var count = 0;
-                for (var ci = 0; ci < inventory.length; ci++) {
-                    if (inventory[ci].quality === qIdx) count++;
-                }
-                if (count === 0) return;
-                var btn = document.createElement('button');
-                btn.textContent = q.name + '(' + count + ')';
-                btn.style.cssText = self._btnStyle(filterQuality === qIdx, q.color);
-                btn.addEventListener('click', function () { self._invFilter = qIdx; self.renderInventory(); });
-                filterRow.appendChild(btn);
-            })(qi);
-        }
-        container.appendChild(filterRow);
-
-        // 批量操作行
-        var batchRow = document.createElement('div');
-        batchRow.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;';
-        // 批量出售低于某品质的
-        var sellLowBtn = document.createElement('button');
-        sellLowBtn.textContent = '一键出售凡品';
-        sellLowBtn.style.cssText = 'flex:1;padding:6px;border:1px solid #666;border-radius:6px;' +
-            'background:rgba(0,0,0,0.3);color:#ccc;font-size:11px;cursor:pointer;';
-        sellLowBtn.addEventListener('click', function () {
-            var count = 0;
-            var stones = 0;
-            for (var si = inventory.length - 1; si >= 0; si--) {
-                if (inventory[si].quality === 0) {  // 凡品
-                    stones += Math.floor((inventory[si].atk + inventory[si].def + inventory[si].hp) * 0.3);
-                    inventory.splice(si, 1);
-                    count++;
-                }
-            }
-            if (count > 0) {
-                Game.data.spiritStones += stones;
-                showToast('出售 ' + count + ' 件凡品，获得 ' + stones + ' 灵石', 2000);
-                Game.saveGame();
-                self.renderInventory();
-                Cultivation.updateAllUI();
-            } else {
-                showToast('没有凡品装备可出售', 1500);
-            }
-        });
-        batchRow.appendChild(sellLowBtn);
-
-        var sellAllBtn = document.createElement('button');
-        sellAllBtn.textContent = '一件不留💀';
-        sellAllBtn.style.cssText = 'flex:1;padding:6px;border:1px solid #e74c3c;border-radius:6px;' +
-            'background:rgba(231,76,60,0.15);color:#e74c3c;font-size:11px;cursor:pointer;';
-        sellAllBtn.addEventListener('click', function () {
-            if (inventory.length === 0) { showToast('背包已空', 1000); return; }
-            if (!confirm('确定出售全部 ' + inventory.length + ' 件装备？此操作不可撤销！')) return;
-            var stones = 0;
-            for (var si2 = inventory.length - 1; si2 >= 0; si2--) {
-                stones += Math.floor((inventory[si2].atk + inventory[si2].def + inventory[si2].hp) * 0.3);
-            }
-            inventory.length = 0;
-            Game.data.spiritStones += stones;
-            showToast('出售全部装备，获得 ' + stones + ' 灵石', 2000);
-            Game.saveGame();
-            self.renderInventory();
-            Cultivation.updateAllUI();
-        });
-        batchRow.appendChild(sellAllBtn);
-        container.appendChild(batchRow);
-
         // 容量提示
         var capHint = document.createElement('div');
         capHint.style.cssText = 'text-align:right;color:var(--text-muted);font-size:11px;margin-bottom:6px;';
@@ -678,15 +585,7 @@ var Equipment = {
         container.appendChild(capHint);
 
         var self = this;
-        // 遍历背包（支持品质筛选）
-        var displayIndices = [];
-        for (var di = 0; di < inventory.length; di++) {
-            if (filterQuality === -1 || inventory[di].quality === filterQuality) {
-                displayIndices.push(di);
-            }
-        }
-
-        for (var vi = 0; vi < displayIndices.length; vi++) {
+        for (var i = 0; i < inventory.length; i++) {
             (function (idx) {
                 var eq = inventory[idx];
                 var q = self.QUALITIES[eq.quality];
