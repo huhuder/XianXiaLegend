@@ -85,49 +85,50 @@ var Cultivation = {
         // 基础修炼速度加成（装备+飞升+天赋）
         var totalCultSpeed = 1 + Ascension.getCultivateSpeedBonus() + getEquipCultSpeed() / 100 + talentCultSpeed / 100;
 
+        // 修炼基础收益提升（让修炼回到有意义的水平——约战斗的30%）
+        var expBaseMult = 3.0;  // 修炼主产出经验
+        var stoneBaseMult = 3.0;  // 修炼也产灵石
+
         var expGain = 0;
         var stoneGain = 0;
         var methodLabel = '';
 
         switch (method) {
-            case 'dazuo':  // 🧘 打坐 — 稳定低收益
-                expGain = Math.floor(mult * randInt(1, 3) * totalCultSpeed * (1 + talentExpBonus));
-                stoneGain = mult * randInt(1, 2);
+            case 'dazuo':  // 🧘 打坐 — 稳定收益（比战斗高30%效率，但不出装备）
+                expGain = Math.floor(mult * randInt(3, 8) * expBaseMult * totalCultSpeed * (1 + talentExpBonus));
+                stoneGain = mult * randInt(2, 5) * stoneBaseMult;
                 stoneGain = Math.floor(stoneGain * (1 + talentSpiritBonus));
                 methodLabel = '打坐';
                 break;
 
             case 'lilian':  // ⚡ 历练 — 消耗灵石，高倍经验
-                var stoneCost = mult * randInt(2, 5);
+                var stoneCost = mult * randInt(5, 12);
                 if (Game.data.spiritStones < stoneCost) {
                     showToast('灵石不足，无法历练！需要 ' + stoneCost + ' 灵石', 2000);
                     return;
                 }
                 Game.data.spiritStones -= stoneCost;
-                expGain = Math.floor(mult * randInt(4, 10) * totalCultSpeed * (1 + talentExpBonus));
-                stoneGain = mult * randInt(1, 3);
+                expGain = Math.floor(mult * randInt(10, 25) * expBaseMult * totalCultSpeed * (1 + talentExpBonus));
+                stoneGain = mult * randInt(2, 5);
                 stoneGain = Math.floor(stoneGain * (1 + talentSpiritBonus));
                 methodLabel = '历练';
                 break;
 
             case 'danyao':  // 💊 丹药 — 消耗灵石激活药效，后续修炼加速
-                // 如果当前没有药效，尝试购买
                 if (!Game.data.cultivatePillBuff || Game.data.cultivatePillBuff <= 0) {
-                    var pillCost = mult * randInt(8, 15);
+                    var pillCost = mult * randInt(15, 30);
                     if (Game.data.spiritStones < pillCost) {
                         showToast('灵石不足，无法购买丹药！需要 ' + pillCost + ' 灵石', 2000);
                         return;
                     }
                     Game.data.spiritStones -= pillCost;
-                    // 丹药buff：持续5次修炼，每次+50%经验
-                    Game.data.cultivatePillBuff = 5;
-                    showToast('服用丹药，接下来5次修炼经验+50%！', 2000);
-                    return; // 本次不产生收益，只激活buff
+                    Game.data.cultivatePillBuff = 8;
+                    showToast('服用丹药，接下来8次修炼经验+80%！', 2000);
+                    return;
                 }
-                // 有药效时正常修炼但消耗buff次数
-                var pillBonus = 0.5;  // +50%
-                expGain = Math.floor(mult * randInt(2, 4) * totalCultSpeed * (1 + talentExpBonus) * (1 + pillBonus));
-                stoneGain = mult * randInt(1, 2);
+                var pillBonus = 0.8;  // +80%
+                expGain = Math.floor(mult * randInt(4, 10) * expBaseMult * totalCultSpeed * (1 + talentExpBonus) * (1 + pillBonus));
+                stoneGain = mult * randInt(2, 4);
                 stoneGain = Math.floor(stoneGain * (1 + talentSpiritBonus));
                 Game.data.cultivatePillBuff = Math.max(0, Game.data.cultivatePillBuff - 1);
                 methodLabel = '丹药';

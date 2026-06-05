@@ -301,8 +301,8 @@ var Equipment = {
        @param {number} mapIndex - 当前地图索引
        ---------------------------------------------------------- */
     rollDrop: function (mapIndex, isBoss) {
-        var dropRate = isBoss ? 0.6 : 0.3;
-        // 先判定是否触发掉落（普通怪 30%，BOSS 60%）
+        var dropRate = isBoss ? 0.8 : 0.5;
+        // 先判定是否触发掉落（普通怪 50%，BOSS 80%）
         if (Math.random() > dropRate) return;
 
         var tier = this.EQUIP_TIERS[mapIndex];

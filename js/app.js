@@ -674,8 +674,9 @@ var Game = {
             if (offlineMs > 60000) {  // 超过1分钟才算离线
                 var offlineMinutes = Math.min(offlineMs / 60000, 480); // 最多8小时
                 var mult2 = getRealmMultiplier(this.data.realmIndex);
-                var offlineExp = Math.floor(mult2 * 1.5 * offlineMinutes);
-                var offlineStones = Math.floor(mult2 * 0.8 * offlineMinutes);
+                // 离线收益 = 修炼的80%效率（离线也修炼，效率稍低）
+                var offlineExp = Math.floor(mult2 * 8 * offlineMinutes);
+                var offlineStones = Math.floor(mult2 * 4 * offlineMinutes);
                 if (offlineExp > 0 || offlineStones > 0) {
                     this.data.experience += offlineExp;
                     this.data.spiritStones += offlineStones;

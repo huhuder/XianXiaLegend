@@ -862,9 +862,10 @@ var Battle = {
         if (this.isBoss) this.bossKillCount++;
         this.updateKillStats();
 
-        // 奖励
-        var expReward = this.isBoss ? zone.exp * 3 : zone.exp;
-        var spiritReward = this.isBoss ? zone.spirit * 3 : zone.spirit;
+        // 奖励（战斗主产出装备，经验和灵石减半以平衡修炼）
+        // BOSS战的经验和灵石保持较高
+        var expReward = this.isBoss ? Math.floor(zone.exp * 2) : Math.floor(zone.exp * 0.5);
+        var spiritReward = this.isBoss ? Math.floor(zone.spirit * 2) : Math.floor(zone.spirit * 0.5);
 
         // 装备/套装经验加成和灵石加成
         var effects = getEquipAndSetEffects();
@@ -878,7 +879,9 @@ var Battle = {
         Game.addExperience(expReward);
         Game.addSpirit(spiritReward);
 
-        // 套装击杀回复：朱雀6件
+        // 战斗掉装备概率提高
+        // 装备掉落
+        Equipment.rollDrop(this.zoneIndex, this.isBoss, 0.5);
         if (effects.killHealPct > 0) {
             var sectBonus = (typeof Sect !== 'undefined' && Sect.getSectBonus)
                 ? Sect.getSectBonus() : { hpPct: 0 };
@@ -918,7 +921,7 @@ var Battle = {
         var killMsg = this.isBoss ? '击杀BOSS「' + monsterName + '」！' : '击杀 ' + monsterName + '！';
         this.addLog(killMsg + ' 经验+' + formatNumber(expReward) + ' 灵石+' + formatNumber(spiritReward), '#ffd700');
 
-        // 装备掉落
+        // 装备掉落（提高掉率，战斗主产出装备）
         Equipment.rollDrop(this.zoneIndex, this.isBoss);
 
         // 1.5秒后刷下一只
