@@ -588,7 +588,7 @@ var Equipment = {
         }
 
         // 过滤品质（当前筛选，默认显示全部）
-        var filterQuality = this._invFilter || -1;  // -1 表示全部
+        var filterQuality = (this._invFilter !== undefined && this._invFilter !== null) ? this._invFilter : -1;
 
         // 筛选按钮行
         var filterRow = document.createElement('div');
@@ -708,30 +708,31 @@ var Equipment = {
                         '</div>';
                 }
 
-                var cardEl = createCard(
-                    '<span style="font-size:14px;">' + s.icon + '</span> ' + eq.name +
-                    (eq.enhance > 0
-                        ? ' <span style="font-size:10px;background:#ffd700;color:#1a1a2e;' +
-                          'padding:1px 4px;border-radius:4px;font-weight:bold;">+' + eq.enhance + '</span>'
-                        : ''),
-                    '<div style="font-size:11px;color:' + q.color + ';margin:2px 0;">【' + q.name + '】' + s.name + '</div>' +
-                    '<div style="font-size:11px;color:#a09080;">' +
-                    '攻击+' + eq.atk + ' 防御+' + eq.def + ' 生命+' + eq.hp + '</div>' +
-                    compareHtml,
-                    '<div style="display:flex;gap:6px;">' +
-                    '<button class="inv-equip-btn" data-idx="' + idx + '" ' +
-                    'style="flex:1;padding:6px;border:1px solid ' + q.color + ';border-radius:6px;' +
-                    'background:rgba(0,0,0,0.3);color:' + q.color + ';font-size:12px;cursor:pointer;">装备</button>' +
-                    '<button class="inv-sell-btn" data-idx="' + idx + '" ' +
-                    'style="padding:6px 10px;border:1px solid #555;border-radius:6px;' +
-                    'background:rgba(0,0,0,0.3);color:#999;font-size:12px;cursor:pointer;">售</button>' +
-                    '</div>'
-                );
+                var cardEl = document.createElement('div');
+                cardEl.className = 'inv-card inv-card-q' + eq.quality;
+                cardEl.style.cssText = 'border:1px solid ' + q.color + ';border-radius:10px;padding:12px 14px;margin-bottom:10px;' +
+                    'background:rgba(15,52,96,0.4);box-shadow:0 0 8px ' + q.color + '22;cursor:pointer;' +
+                    'transition:all 0.2s;position:relative;overflow:hidden;';
 
-                cardEl.style.cssText = 'border:1px solid ' + q.color +
-                    ';border-radius:10px;padding:10px 12px;margin-bottom:8px;' +
-                    'background:rgba(15,52,96,0.4);' +
-                    'box-shadow:0 0 6px ' + q.color + '22;cursor:pointer;';
+                cardEl.innerHTML =
+                    '<div style="display:flex;align-items:center;gap:10px;">' +
+                        '<div style="font-size:24px;min-width:32px;text-align:center;">' + s.icon + '</div>' +
+                        '<div style="flex:1;min-width:0;">' +
+                            '<div style="font-size:13px;font-weight:bold;color:' + q.color + ';">' + eq.name + '</div>' +
+                            '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">【' + q.name + '】' + s.name + '</div>' +
+                            '<div style="display:flex;gap:12px;margin-top:6px;">' +
+                                '<span style="font-size:12px;color:' + q.color + ';">⚔️+' + eq.atk + '</span>' +
+                                '<span style="font-size:12px;color:' + q.color + ';">🛡️+' + eq.def + '</span>' +
+                                '<span style="font-size:12px;color:' + q.color + ';">❤️+' + eq.hp + '</span>' +
+                            '</div>' +
+                            compareHtml +
+                        '</div>' +
+                        '<div style="display:flex;flex-direction:column;gap:6px;">' +
+                            '<button class="inv-equip-btn" data-idx="' + idx + '" style="padding:6px 14px;border:1px solid ' + q.color + ';border-radius:6px;background:rgba(0,0,0,0.3);color:' + q.color + ';font-size:12px;cursor:pointer;white-space:nowrap;transition:all 0.15s;">装备</button>' +
+                            '<button class="inv-sell-btn" data-idx="' + idx + '" style="padding:4px 10px;border:1px solid #555;border-radius:6px;background:rgba(0,0,0,0.3);color:#888;font-size:11px;cursor:pointer;transition:all 0.15s;">出售</button>' +
+                        '</div>' +
+                    '</div>';
+
                 container.appendChild(cardEl);
 
                 // 卡片点击显示详情（按钮点击会阻止冒泡）
@@ -740,7 +741,7 @@ var Equipment = {
                         self.showDetail(eq);
                     }
                 });
-            })(i);
+            })(displayIndices[vi]);
         }
 
         // 绑定事件
@@ -1184,8 +1185,12 @@ var Equipment = {
         }
         if (totalAtk > 0 || totalDef > 0 || totalHp > 0) {
             var bonusDiv = document.createElement('div');
-            bonusDiv.style.cssText = 'text-align:center;color:#d4a574;font-size:12px;margin-bottom:10px;';
-            bonusDiv.textContent = '装备加成：攻击+' + totalAtk + ' 防御+' + totalDef + ' 生命+' + totalHp;
+            bonusDiv.style.cssText = 'text-align:center;padding:8px 12px;margin-bottom:12px;' +
+                'background:rgba(212,165,116,0.08);border:1px solid rgba(212,165,116,0.2);border-radius:8px;';
+            bonusDiv.innerHTML = '<span style="color:#d4a574;font-size:12px;">装备加成：</span>' +
+                '<span style="color:#ffd700;font-size:13px;font-weight:bold;">⚔️+' + totalAtk + '</span> ' +
+                '<span style="color:#ffd700;font-size:13px;font-weight:bold;">🛡️+' + totalDef + '</span> ' +
+                '<span style="color:#ffd700;font-size:13px;font-weight:bold;">❤️+' + totalHp + '</span>';
             container.appendChild(bonusDiv);
         }
 
@@ -1193,14 +1198,14 @@ var Equipment = {
         var activeSets = self.getActiveSetBonuses();
         if (activeSets.length > 0) {
             var setSummary = document.createElement('div');
-            setSummary.style.cssText = 'text-align:center;margin-bottom:10px;';
+            setSummary.style.cssText = 'text-align:center;margin-bottom:12px;';
             for (var si = 0; si < activeSets.length; si++) {
                 var as = activeSets[si];
                 var badge = document.createElement('span');
-                badge.style.cssText = 'display:inline-block;margin:2px 4px;padding:3px 10px;' +
-                    'background:rgba(0,255,136,0.12);border:1px solid rgba(0,255,136,0.3);' +
-                    'border-radius:8px;font-size:12px;color:#00ff88;';
-                badge.textContent = as.setName + ' ' + as.count + '/6 · ' + as.bonusDesc;
+                badge.style.cssText = 'display:inline-block;margin:2px 4px;padding:4px 12px;' +
+                    'background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);' +
+                    'border-radius:12px;font-size:11px;color:#00ff88;letter-spacing:1px;';
+                badge.textContent = '✨ ' + as.setName + ' ' + as.count + '/6 · ' + as.bonusDesc;
                 setSummary.appendChild(badge);
             }
             container.appendChild(setSummary);
@@ -1208,7 +1213,7 @@ var Equipment = {
 
         // 槽位网格
         var grid = document.createElement('div');
-        grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;';
+        grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;';
         var self = this;
 
         for (var j = 0; j < 6; j++) {
@@ -1219,29 +1224,34 @@ var Equipment = {
                 var slotCard = document.createElement('div');
                 if (equip) {
                     var q = self.QUALITIES[equip.quality];
+                    slotCard.className = 'equip-slot filled';
                     slotCard.style.cssText = 'border:1px solid ' + q.color +
-                        ';border-radius:8px;padding:8px;text-align:center;' +
-                        'background:rgba(15,52,96,0.3);cursor:pointer;' +
-                        'box-shadow:0 0 4px ' + q.color + '22;';
-                    slotCard.innerHTML = '<div style="font-size:20px;">' + slot.icon + '</div>' +
-                        '<div style="font-size:10px;color:#a09080;">' + slot.name + '</div>' +
-                        '<div style="font-size:11px;color:' + q.color + ';font-weight:bold;">' +
+                        ';border-radius:10px;padding:10px 8px;text-align:center;' +
+                        'background:rgba(15,52,96,0.35);cursor:pointer;' +
+                        'box-shadow:0 0 6px ' + q.color + '22;transition:all 0.2s;';
+                    slotCard.innerHTML = '<div style="font-size:22px;">' + slot.icon + '</div>' +
+                        '<div style="font-size:10px;color:var(--text-muted);margin:2px 0;">' + slot.name + '</div>' +
+                        '<div style="font-size:11px;color:' + q.color + ';font-weight:bold;margin:2px 0;">' +
                         equip.name.substring(0, 6) +
                         (equip.enhance > 0 ? '<span style="font-size:9px;background:#ffd700;color:#1a1a2e;' +
-                            'padding:1px 4px;border-radius:4px;margin-left:4px;font-weight:bold;">+' + equip.enhance + '</span>' : '') +
+                            'padding:1px 5px;border-radius:4px;margin-left:4px;font-weight:bold;">+' + equip.enhance + '</span>' : '') +
                         '</div>' +
-                        '<div style="font-size:9px;color:#6a5f50;">攻击+' + equip.atk +
-                        ' 防御+' + equip.def + ' 生命+' + equip.hp + '</div>';
+                        '<div style="display:flex;gap:4px;justify-content:center;margin-top:4px;">' +
+                            '<span style="font-size:9px;color:' + q.color + ';">⚔️+' + equip.atk + '</span>' +
+                            '<span style="font-size:9px;color:' + q.color + ';">🛡️+' + equip.def + '</span>' +
+                            '<span style="font-size:9px;color:' + q.color + ';">❤️+' + equip.hp + '</span>' +
+                        '</div>';
                     slotCard.title = '点击查看 ' + equip.name;
                     slotCard.addEventListener('click', function () {
                         self.showDetail(equip, idx);
                     });
                 } else {
-                    slotCard.style.cssText = 'border:1px dashed #3a3a4a;border-radius:8px;' +
-                        'padding:8px;text-align:center;background:rgba(10,10,25,0.4);';
-                    slotCard.innerHTML = '<div style="font-size:20px;">' + slot.icon + '</div>' +
-                        '<div style="font-size:10px;color:#555;">' + slot.name + '</div>' +
-                        '<div style="font-size:11px;color:#444;">空</div>';
+                    slotCard.className = 'equip-slot empty';
+                    slotCard.style.cssText = 'border:1px dashed rgba(58,58,74,0.5);border-radius:10px;' +
+                        'padding:10px 8px;text-align:center;background:rgba(10,10,25,0.4);';
+                    slotCard.innerHTML = '<div style="font-size:22px;opacity:0.4;">' + slot.icon + '</div>' +
+                        '<div style="font-size:10px;color:#555;margin:2px 0;">' + slot.name + '</div>' +
+                        '<div style="font-size:11px;color:#3a3a4a;">空</div>';
                 }
                 grid.appendChild(slotCard);
             })(j);
