@@ -72,8 +72,8 @@ var Battle = {
         var playerPower = playerEff.hp * 0.5 + playerEff.atk * 2.5 + playerEff.def * 1.8;
         if (playerPower > basePower * 2) {
             // 玩家战力超过基础2倍时，开始补偿
-            playerScale = 1.0 + (playerPower / basePower - 2) * 0.2;
-            playerScale = Math.min(playerScale, 3.0);
+            playerScale = 1.0 + (playerPower / basePower - 2) * 0.25;
+            playerScale = Math.min(playerScale, 4.0);
         }
 
         var mult = playerScale * diffCoeff;

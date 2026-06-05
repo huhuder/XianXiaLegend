@@ -75,6 +75,10 @@ var Game = {
         beastFood: 0,               // 灵兽口粮
         beastCaptureDate: '',        // 捕捉刷新日期 'YYYY-MM-DD'
         beastCaptureSlots: [],       // 当前捕捉槽位灵兽名列表
+        // 修炼系统增强（第一批优化新增）
+        cultivateMethod: 'dazuo',    // 修炼模式：dazuo(打坐) lilian(历练) danyao(丹药)
+        cultivatePillBuff: 0,        // 丹药临时加成（剩余次数）
+        lastSaveTime: Date.now(),    // 上次存档时间（用于计算离线收益）
     },
 
     /** 运行时游戏数据（初始化为默认值） */
@@ -139,6 +143,15 @@ var Game = {
         console.log('[仙侠传奇] 修仙世界已就绪 | 境界：' + Cultivation.getRealmDisplayName() +
                     ' | 战力：' + formatNumber(this.calcPower()) +
                     ' | 灵石：' + formatNumber(this.data.spiritStones));
+
+        // 显示离线收益提示
+        if (this._offlineReward) {
+            var r = this._offlineReward;
+            var msg = '你离开了 ' + r.minutes + ' 分钟。<br>';
+            if (r.exp > 0) msg += '自动修炼获得 <span style="color:#2ecc71">经验+' + formatNumber(r.exp) + '</span><br>';
+            if (r.stones > 0) msg += '获得 <span style="color:#ffd700">灵石+' + formatNumber(r.stones) + '</span>';
+            setTimeout(function () { showToast(msg, 4000); }, 500);
+        }
     },
 
     /** 缓存所有 DOM 引用 */
@@ -201,6 +214,23 @@ var Game = {
             navItems[i].addEventListener('click', function () {
                 var tabName = this.getAttribute('data-tab');
                 Game.switchTab(tabName);
+            });
+        }
+
+        // 修炼模式切换
+        var methodBtns = document.querySelectorAll('.method-btn');
+        for (var m = 0; m < methodBtns.length; m++) {
+            methodBtns[m].addEventListener('click', function () {
+                var method = this.getAttribute('data-method');
+                if (Game.data.cultivateMethod === method) return;
+                Game.data.cultivateMethod = method;
+                // 更新按钮高亮
+                var allMethods = document.querySelectorAll('.method-btn');
+                for (var am = 0; am < allMethods.length; am++) {
+                    allMethods[am].classList.remove('active');
+                }
+                this.classList.add('active');
+                Game.saveGame();
             });
         }
     },
@@ -387,6 +417,7 @@ var Game = {
 
     saveGame: function () {
         try {
+            this.data.lastSaveTime = Date.now();
             var saveData = JSON.stringify(this.data);
             localStorage.setItem(this.SAVE_KEY, saveData);
         } catch (e) {
@@ -576,6 +607,26 @@ var Game = {
             }
             if (!this.data.beastCaptureSlots || !Array.isArray(this.data.beastCaptureSlots)) {
                 this.data.beastCaptureSlots = [];
+            }
+            // 修炼模式兼容（第一批优化新增）
+            if (this.data.cultivateMethod === undefined) this.data.cultivateMethod = 'dazuo';
+            if (this.data.cultivatePillBuff === undefined) this.data.cultivatePillBuff = 0;
+            // 离线收益：计算离线时间并给予补偿
+            var now = Date.now();
+            var lastSave = this.data.lastSaveTime || now;
+            var offlineMs = now - lastSave;
+            this.data.lastSaveTime = now;
+            if (offlineMs > 60000) {  // 超过1分钟才算离线
+                var offlineMinutes = Math.min(offlineMs / 60000, 480); // 最多8小时
+                var mult2 = getRealmMultiplier(this.data.realmIndex);
+                var offlineExp = Math.floor(mult2 * 1.5 * offlineMinutes);
+                var offlineStones = Math.floor(mult2 * 0.8 * offlineMinutes);
+                if (offlineExp > 0 || offlineStones > 0) {
+                    this.data.experience += offlineExp;
+                    this.data.spiritStones += offlineStones;
+                    this._offlineReward = { exp: offlineExp, stones: offlineStones, minutes: Math.round(offlineMinutes) };
+                    console.log('[离线] 离开' + Math.round(offlineMinutes) + '分钟，获得经验+' + offlineExp + ' 灵石+' + offlineStones);
+                }
             }
             // 秘境层数系统兼容（第12批新增）
             if (!this.data.mysticRealmClearedLayers || typeof this.data.mysticRealmClearedLayers !== 'object') {

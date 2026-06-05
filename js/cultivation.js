@@ -74,45 +74,87 @@ var Cultivation = {
     cultivate: function (isAuto) {
         if (this.isMaxRealm()) return;
 
+        var method = Game.data.cultivateMethod || 'dazuo';
         var mult = getRealmMultiplier(Game.data.realmIndex);
-        var baseExp = mult * randInt(1, 3);
 
-        // 天赋修炼速度和经验加成
+        // 天赋加成
         var talentCultSpeed = (typeof Talents !== 'undefined' && Talents.getCultSpeedBonus) ? Talents.getCultSpeedBonus() : 0;
         var talentExpBonus = (typeof Talents !== 'undefined' && Talents.getExpBonusRate) ? Talents.getExpBonusRate() : 0;
-
-        var totalCultSpeed = 1 + Ascension.getCultivateSpeedBonus() + getEquipCultSpeed() / 100 + talentCultSpeed / 100;
-        var expGain = Math.floor(baseExp * totalCultSpeed * (1 + talentExpBonus));
-        var stoneGain = mult * randInt(1, 2);
-
-        // 天赋灵石加成
         var talentSpiritBonus = (typeof Talents !== 'undefined' && Talents.getSpiritBonusRate) ? Talents.getSpiritBonusRate() : 0;
-        stoneGain = Math.floor(stoneGain * (1 + talentSpiritBonus));
 
+        // 基础修炼速度加成（装备+飞升+天赋）
+        var totalCultSpeed = 1 + Ascension.getCultivateSpeedBonus() + getEquipCultSpeed() / 100 + talentCultSpeed / 100;
+
+        var expGain = 0;
+        var stoneGain = 0;
+        var methodLabel = '';
+
+        switch (method) {
+            case 'dazuo':  // 🧘 打坐 — 稳定低收益
+                expGain = Math.floor(mult * randInt(1, 3) * totalCultSpeed * (1 + talentExpBonus));
+                stoneGain = mult * randInt(1, 2);
+                stoneGain = Math.floor(stoneGain * (1 + talentSpiritBonus));
+                methodLabel = '打坐';
+                break;
+
+            case 'lilian':  // ⚡ 历练 — 消耗灵石，高倍经验
+                var stoneCost = mult * randInt(2, 5);
+                if (Game.data.spiritStones < stoneCost) {
+                    showToast('灵石不足，无法历练！需要 ' + stoneCost + ' 灵石', 2000);
+                    return;
+                }
+                Game.data.spiritStones -= stoneCost;
+                expGain = Math.floor(mult * randInt(4, 10) * totalCultSpeed * (1 + talentExpBonus));
+                stoneGain = mult * randInt(1, 3);
+                stoneGain = Math.floor(stoneGain * (1 + talentSpiritBonus));
+                methodLabel = '历练';
+                break;
+
+            case 'danyao':  // 💊 丹药 — 消耗灵石激活药效，后续修炼加速
+                // 如果当前没有药效，尝试购买
+                if (!Game.data.cultivatePillBuff || Game.data.cultivatePillBuff <= 0) {
+                    var pillCost = mult * randInt(8, 15);
+                    if (Game.data.spiritStones < pillCost) {
+                        showToast('灵石不足，无法购买丹药！需要 ' + pillCost + ' 灵石', 2000);
+                        return;
+                    }
+                    Game.data.spiritStones -= pillCost;
+                    // 丹药buff：持续5次修炼，每次+50%经验
+                    Game.data.cultivatePillBuff = 5;
+                    showToast('服用丹药，接下来5次修炼经验+50%！', 2000);
+                    return; // 本次不产生收益，只激活buff
+                }
+                // 有药效时正常修炼但消耗buff次数
+                var pillBonus = 0.5;  // +50%
+                expGain = Math.floor(mult * randInt(2, 4) * totalCultSpeed * (1 + talentExpBonus) * (1 + pillBonus));
+                stoneGain = mult * randInt(1, 2);
+                stoneGain = Math.floor(stoneGain * (1 + talentSpiritBonus));
+                Game.data.cultivatePillBuff = Math.max(0, Game.data.cultivatePillBuff - 1);
+                methodLabel = '丹药';
+                break;
+        }
+
+        // 更新状态
         Game.data.experience += expGain;
         Game.data.spiritStones += stoneGain;
         Game.data.totalCultivations += 1;
 
-        // 宗门任务进度联动 — 修炼
+        // 宗门任务进度联动
         if (typeof Sect !== 'undefined') {
             Sect.updateTaskProgress('cultivate', 1);
-            // 灵石类任务进度联动
             Sect.updateTaskProgress('stones', stoneGain);
         }
 
-        // 视觉效果
+        // 视觉效果 - 不同模式不同颜色
+        var color = method === 'dazuo' ? '#ffd700' : (method === 'lilian' ? '#ff8800' : '#2ecc71');
         var dom = Game.dom;
-        showCultivateFloat(dom.cultivateBtn, dom.floatTextContainer, expGain, stoneGain);
+        showCultivateFloat(dom.cultivateBtn, dom.floatTextContainer, expGain, stoneGain, methodLabel, color);
 
-        // 手动点击必定粒子，自动修炼30%概率
         if (!isAuto || Math.random() < 0.3) {
             spawnParticles(dom.cultivateBtn, randInt(3, 6));
         }
 
-        // 更新UI
         this.updateAllUI();
-
-        // 关键操作立即保存
         Game.saveGame();
     },
 
@@ -178,7 +220,84 @@ var Cultivation = {
         this.updateCultivateButton();
         this.updateStatsPanel();
         this.updateExpBar();
+        this.updateGuideCard();  // 引导卡片
         Game.updatePower();
+    },
+
+    /** 更新引导卡片内容 */
+    updateGuideCard: function () {
+        var title = document.getElementById('guide-title');
+        var desc = document.getElementById('guide-desc');
+        if (!title || !desc) return;
+
+        var d = Game.data;
+        var realmName = REALMS[d.realmIndex];
+        var expFull = this.isExpFull();
+        var maxRealm = this.isMaxRealm();
+
+        // 检查装备情况
+        var hasEquipped = false;
+        if (d.equipped) {
+            for (var ei = 0; ei < d.equipped.length; ei++) {
+                if (d.equipped[ei]) { hasEquipped = true; break; }
+            }
+        }
+
+        // 检查背包是否有装备
+        var hasInventory = d.inventory && d.inventory.length > 0;
+
+        // 检查宗门
+        var hasSect = d.sectIndex >= 0;
+
+        // 检查灵兽
+        var hasBeast = d.capturedBeasts && d.capturedBeasts.length > 0;
+
+        if (maxRealm) {
+            title.textContent = '🎉 已臻圆满';
+            desc.innerHTML = '已至真仙·十层，万法皆空，道友已证大道！';
+            return;
+        }
+
+        if (expFull && this.isAscensionThreshold()) {
+            title.textContent = '⚡ 天劫将至';
+            desc.innerHTML = '渡劫圆满，速往 <span class="warn">飞升</span> 界面引动天劫！';
+            return;
+        }
+
+        if (expFull) {
+            title.textContent = '⬆️ 可突破！';
+            desc.innerHTML = '经验已满，点击修炼按钮 <span class="highlight">突破</span> 至下一层！';
+            return;
+        }
+
+        // 战斗Tab已经有挂机装备提示，这里显示修炼建议
+        if (d.realmIndex === 0 && d.layer < 3) {
+            title.textContent = '📋 新手引导';
+            desc.innerHTML = '点击修炼按钮开始修仙，或切换至 <span class="highlight">战斗</span> 打怪刷装备';
+            return;
+        }
+
+        if (!hasEquipped && !hasInventory && d.totalCultivations > 5) {
+            title.textContent = '⚔️ 缺少装备';
+            desc.innerHTML = '去 <span class="highlight">战斗</span> 挂机打怪，可掉落装备提升实力';
+            return;
+        }
+
+        if (!hasSect && d.realmIndex >= 1) {
+            title.textContent = '🏯 加入宗门';
+            desc.innerHTML = '修为已达炼气，可前往 <span class="highlight">宗门</span> 加入一方势力';
+            return;
+        }
+
+        if (!hasBeast && d.realmIndex >= 2) {
+            title.textContent = '🐾 捕捉灵兽';
+            desc.innerHTML = '已达筑基期，可前往 <span class="highlight">宗门 > 灵兽</span> 捕捉灵兽助战';
+            return;
+        }
+
+        // 普通状态
+        title.textContent = '📋 修行指引';
+        desc.innerHTML = '继续 <span class="highlight">修炼</span> 积累经验，或去 <span class="highlight">战斗</span> 刷怪获取灵石装备';
     },
 
     /** 更新灵石显示 */

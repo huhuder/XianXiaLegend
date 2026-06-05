@@ -32,6 +32,14 @@
 
         <!-- ========== 角色Tab ========== -->
         <div class="tab-page active" id="tab-character">
+            <!-- 目标引导卡片 -->
+            <div class="guide-card" id="guide-card">
+                <div class="guide-icon">📋</div>
+                <div class="guide-content">
+                    <div class="guide-title" id="guide-title">修行指引</div>
+                    <div class="guide-desc" id="guide-desc">点击修炼开始你的修仙之路</div>
+                </div>
+            </div>
             <!-- 头像区 -->
             <div class="avatar-section">
                 <div class="avatar-circle">🧘</div>
@@ -65,6 +73,12 @@
                 </button>
                 <div class="cultivation-stats">
                     <span>累计修炼 <strong id="total-cults">0</strong> 次</span>
+                </div>
+                <!-- 修炼模式选择 -->
+                <div class="cultivation-methods" id="cultivation-methods">
+                    <button class="method-btn active" data-method="dazuo" title="稳扎稳打，基础收益">🧘 打坐</button>
+                    <button class="method-btn" data-method="lilian" title="消耗灵石换取高倍经验">⚡ 历练</button>
+                    <button class="method-btn" data-method="danyao" title="消耗灵石获得临时加成">💊 丹药</button>
                 </div>
             </div>
 

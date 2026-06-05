@@ -15,12 +15,16 @@
  * @param {number} x - X 坐标
  * @param {number} y - Y 坐标
  */
-function showFloatText(container, text, cssClass, x, y) {
+function showFloatText(container, text, cssClass, x, y, color) {
     const el = document.createElement('div');
-    el.className = 'float-text ' + cssClass;
+    el.className = 'float-text ' + (cssClass || '');
     el.textContent = text;
     el.style.left = x + 'px';
     el.style.top = y + 'px';
+    if (color) {
+        el.style.color = color;
+        el.style.textShadow = '0 0 10px ' + color;
+    }
     container.appendChild(el);
     el.addEventListener('animationend', function () { el.remove(); });
 }
@@ -32,10 +36,13 @@ function showFloatText(container, text, cssClass, x, y) {
  * @param {number} expGain - 经验获取
  * @param {number} stoneGain - 灵石获取
  */
-function showCultivateFloat(btnEl, container, expGain, stoneGain) {
+function showCultivateFloat(btnEl, container, expGain, stoneGain, methodLabel, color) {
     var rect = btnEl.getBoundingClientRect();
     var cx = rect.left + rect.width / 2;
     var cy = rect.top;
+    if (methodLabel) {
+        showFloatText(container, '【' + methodLabel + '】', 'method', cx - 30, cy - 30, color);
+    }
     showFloatText(container, '+ ' + expGain + ' 经验', 'exp', cx - 40 - randInt(0, 20), cy);
     showFloatText(container, '+ ' + stoneGain + ' 灵石', 'stone', cx + 10 + randInt(0, 20), cy + 10);
 }
