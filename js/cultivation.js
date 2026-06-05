@@ -154,6 +154,11 @@ var Cultivation = {
         Game.data.attack += mult * 20;
         Game.data.defense += mult * 15;
 
+        // 如果在战斗挂机中，立即刷新怪物数值（避免用旧属性打怪）
+        if (typeof Battle !== 'undefined' && Battle.active) {
+            Battle.respawnAfterBreakthrough();
+        }
+
         // 更新UI
         this.updateAllUI();
 
