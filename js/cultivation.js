@@ -186,9 +186,12 @@ var Cultivation = {
         if (isNewRealm) {
             Game.data.realmIndex += 1;
             Game.data.layer = 0;
-            triggerGoldenFlash(Game.dom.goldenFlash);
+            triggerGoldenFlash(Game.dom.goldenFlash, REALMS[Game.data.realmIndex], true);
         } else {
             Game.data.layer += 1;
+            var curRealm = REALMS[Game.data.realmIndex];
+            var layerName = curRealm + '·' + (Game.data.layer + 1) + '层';
+            triggerGoldenFlash(Game.dom.goldenFlash, layerName, false);
         }
 
         // 属性提升

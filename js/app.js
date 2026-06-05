@@ -78,6 +78,7 @@ var Game = {
         // 修炼系统增强（第一批优化新增）
         cultivateMethod: 'dazuo',    // 修炼模式：dazuo(打坐) lilian(历练) danyao(丹药)
         cultivatePillBuff: 0,        // 丹药临时加成（剩余次数）
+        lastSubTab: {},              // 各Tab上次选中的子Tab { 'character': 'stats', 'sect': 'sect-info', 'world': 'boss' }
         lastSaveTime: Date.now(),    // 上次存档时间（用于计算离线收益）
     },
 
@@ -233,6 +234,20 @@ var Game = {
                 Game.saveGame();
             });
         }
+
+        // 子Tab切换记忆（统一监听所有 .sub-tab-btn）
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.sub-tab-btn');
+            if (!btn) return;
+            var tabPage = btn.closest('.tab-page');
+            if (!tabPage) return;
+            var tabName = tabPage.id ? tabPage.id.replace('tab-', '') : '';
+            if (!tabName) return;
+            var sub = btn.getAttribute('data-sub');
+            if (sub) {
+                Game.data.lastSubTab[tabName] = sub;
+            }
+        });
     },
 
     /* ----------------------------------------------------------
@@ -270,6 +285,18 @@ var Game = {
         if (tabName === 'character' && !this._equipInit) {
             Equipment.init();
             this._equipInit = true;
+        }
+
+        // 恢复上次选中的子Tab
+        var lastSub = this.data.lastSubTab[tabName];
+        if (lastSub) {
+            var subBtns = targetPage ? targetPage.querySelectorAll('.sub-tab-btn') : [];
+            for (var sbi = 0; sbi < subBtns.length; sbi++) {
+                if (subBtns[sbi].getAttribute('data-sub') === lastSub) {
+                    subBtns[sbi].click();
+                    break;
+                }
+            }
         }
 
         // 角色Tab：渲染天赋子页面
@@ -387,16 +414,17 @@ var Game = {
         var effectiveDef = Math.floor(d.defense * (1 + totalDefPct / 100)) + beastDef;
         var effectiveHp = Math.floor(d.hp * (1 + totalHpPct / 100)) + beastHp;
 
-        // 基础战力
-        var power = effectiveAtk * 2.5 + effectiveDef * 1.8 + effectiveHp * 0.5;
+        // 重做战力公式：攻击权重最高，防御次之，生命和暴击作为补充
+        // 让战力变化更直观——换装备时atk变化直接影响战力
+        var power = effectiveAtk * 3 + effectiveDef * 2 + effectiveHp * 0.5;
 
-        // 装备特殊效果
+        // 装备特殊效果（权重调低，不再喧宾夺主）
         var eff = Equipment.getTotalEquipEffects();
         var totalCritRate = (d.critRate || 0.05) * 100 + eff.critRate + talentEff.critRate + beastCritRate;
         var totalDodgeRate = eff.dodgeRate;
         var totalLifesteal = eff.lifesteal;
 
-        power += totalCritRate * 30 + totalDodgeRate * 20 + totalLifesteal * 15;
+        power += totalCritRate * 8 + totalDodgeRate * 6 + totalLifesteal * 5;
 
         // 飞升倍率加成
         power *= Ascension.getAscensionMultiplier();
@@ -611,6 +639,10 @@ var Game = {
             // 修炼模式兼容（第一批优化新增）
             if (this.data.cultivateMethod === undefined) this.data.cultivateMethod = 'dazuo';
             if (this.data.cultivatePillBuff === undefined) this.data.cultivatePillBuff = 0;
+            // 子Tab记忆
+            if (this.data.lastSubTab === undefined || typeof this.data.lastSubTab !== 'object') {
+                this.data.lastSubTab = {};
+            }
             // 离线收益：计算离线时间并给予补偿
             var now = Date.now();
             var lastSave = this.data.lastSaveTime || now;

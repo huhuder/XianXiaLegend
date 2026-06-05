@@ -85,11 +85,39 @@ function spawnParticles(containerEl, count) {
 /**
  * 触发全屏金光特效（突破境界时）
  * @param {HTMLElement} flashEl - 金光元素
+ * @param {string} realmName - 新境界名称（可选）
+ * @param {boolean} isNewRealm - 是否大境界突破
  */
-function triggerGoldenFlash(flashEl) {
+function triggerGoldenFlash(flashEl, realmName, isNewRealm) {
     flashEl.classList.remove('flash');
-    void flashEl.offsetWidth; // 强制回流，确保动画重新触发
+    void flashEl.offsetWidth;
     flashEl.classList.add('flash');
+
+    // 突破大字幕
+    if (realmName) {
+        var msg = isNewRealm ? '🎉 突破！' + realmName + ' 🎉' : '⬆️ 晋升 ' + realmName;
+        var bigText = document.createElement('div');
+        bigText.style.cssText =
+            'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
+            'z-index:10001;font-size:' + (isNewRealm ? '42px' : '28px') + ';' +
+            'font-weight:bold;color:#ffd700;text-shadow:0 0 30px rgba(255,215,0,0.8),0 0 60px rgba(255,215,0,0.4);' +
+            'font-family:STKaiti,KaiTi,serif;letter-spacing:' + (isNewRealm ? '6px' : '3px') + ';' +
+            'white-space:nowrap;pointer-events:none;' +
+            'animation:bigTextPop 1.8s ease-out forwards;';
+        bigText.textContent = msg;
+        document.body.appendChild(bigText);
+
+        // 屏幕轻微震动
+        var gameContainer = document.getElementById('game-container');
+        if (gameContainer && isNewRealm) {
+            gameContainer.style.animation = 'screenShake 0.3s ease';
+            setTimeout(function () {
+                if (gameContainer) gameContainer.style.animation = '';
+            }, 400);
+        }
+
+        setTimeout(function () { bigText.remove(); }, 2000);
+    }
 }
 
 /* ----------------------------------------------------------

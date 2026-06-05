@@ -419,6 +419,24 @@ body {
     100% { opacity: 0; }
 }
 
+/* 突破大字幕动画 */
+@keyframes bigTextPop {
+    0% { opacity: 0; transform: translate(-50%,-50%) scale(0.5); }
+    20% { opacity: 1; transform: translate(-50%,-50%) scale(1.1); }
+    30% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+    70% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%,-60%) scale(0.9); }
+}
+
+/* 屏幕震动 */
+@keyframes screenShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-3px); }
+    40% { transform: translateX(3px); }
+    60% { transform: translateX(-2px); }
+    80% { transform: translateX(2px); }
+}
+
 /* ============================================================
    属性面板
    ============================================================ */
