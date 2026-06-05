@@ -148,12 +148,17 @@ var WorldBoss = {
     _getBossData: function (bossIndex) {
         var boss = WORLD_BOSSES[bossIndex];
         if (!Game.data.bossData[bossIndex]) {
+            var stats = getBossStats(bossIndex);
             Game.data.bossData[bossIndex] = {
-                hp: getBossStats(bossIndex).hp,
+                hp: stats.hp,
+                maxHp: stats.hp,  // 保存最大血量，不再动态计算
                 alive: true,
                 respawnAt: null,
                 topDamage: []
             };
+        } else if (!Game.data.bossData[bossIndex].maxHp) {
+            // 兼容旧存档：补充maxHp字段
+            Game.data.bossData[bossIndex].maxHp = Game.data.bossData[bossIndex].hp;
         }
         return Game.data.bossData[bossIndex];
     },
@@ -189,7 +194,8 @@ var WorldBoss = {
             var boss = WORLD_BOSSES[i];
             var bd = this._getBossData(i);
             var unlocked = playerRealm >= boss.realmRequired;
-            var hpPct = bd.alive && bd.hp > 0 ? Math.max(0, Math.floor(bd.hp / getBossStats(i).hp * 100)) : 0;
+            var maxHp = bd.maxHp || getBossStats(i).hp;
+            var hpPct = bd.alive && bd.hp > 0 ? Math.max(0, Math.floor(bd.hp / maxHp * 100)) : 0;
 
             // 刷新倒计时
             var countdownHtml = '';
@@ -225,7 +231,7 @@ var WorldBoss = {
                 html += '<div class="boss-card-hp-bar">' +
                     '<div class="boss-card-hp-fill" style="width:' + hpPct + '%;"></div>' +
                     '</div>' +
-                    '<div class="boss-card-hp-text">' + formatNumber(bd.hp) + ' / ' + formatNumber(getBossStats(i).hp) + '</div>';
+                    '<div class="boss-card-hp-text">' + formatNumber(bd.hp) + ' / ' + formatNumber(maxHp) + '</div>';
             } else {
                 html += '<div class="boss-card-hp-bar dead-bar"><div class="boss-card-hp-fill dead-fill" style="width:0%;"></div></div>';
                 html += countdownHtml;
@@ -320,9 +326,8 @@ var WorldBoss = {
         var bd = this._getBossData(bossIndex);
         this.currentBossIndex = bossIndex;
 
-        var bossStats = getBossStats(bossIndex);
-
-        var hpPct = bd.alive ? Math.max(0, Math.floor(bd.hp / bossStats.hp * 100)) : 0;
+        var maxHp = bd.maxHp || getBossStats(bossIndex).hp;
+        var hpPct = bd.alive ? Math.max(0, Math.floor(bd.hp / maxHp * 100)) : 0;
         var now = Date.now();
 
         var html = '';

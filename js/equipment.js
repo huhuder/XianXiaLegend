@@ -225,75 +225,15 @@ var Equipment = {
         var tierIndex = mapIndex;
         var tier = this.EQUIP_TIERS[tierIndex];
 
-        // 随机品质
         var qualityIndex = 0;
         var roll = Math.random() * 100;
         var cumulative = 0;
         for (var i = 0; i < tier.qRates.length; i++) {
             cumulative += tier.qRates[i];
-            if (roll <= cumulative) {
-                qualityIndex = i;
-                break;
-            }
+            if (roll <= cumulative) { qualityIndex = i; break; }
         }
 
-        // 随机槽位
-        var slotIndex = randInt(0, 5);
-        var quality = this.QUALITIES[qualityIndex];
-        var slot = this.SLOTS[slotIndex];
-
-        // 套装判定
-        var setName = null;
-        var setSlotName = null;
-        if (Math.random() < this.SET_CHANCE) {
-            var setIdx = randInt(0, this.SETS.length - 1);
-            var set = this.SETS[setIdx];
-            setName = set.name;
-            setSlotName = set.slots[slotIndex];
-        }
-
-        // 生成随机名称：前缀 + 词根 + 后缀
-        var prefixArr = this.PREFIX_BY_QUALITY[qualityIndex] || [''];
-        var prefix = prefixArr[randInt(0, prefixArr.length - 1)];
-        var wordBank = this.WORD_BANK[slotIndex];
-        var root = wordBank ? wordBank[randInt(0, wordBank.length - 1)] : '无名';
-        var suffix = this.SLOT_SUFFIX[slotIndex] || '器';
-
-        var equipName;
-        if (setName && setSlotName) {
-            equipName = quality.name + '·' + setSlotName;
-        } else {
-            equipName = prefix + root + suffix;
-        }
-
-        // 基础属性随机 + 品质倍率
-        var baseAtk = Math.floor(randInt(tier.atk[0], tier.atk[1]) * quality.mult);
-        var baseDef = Math.floor(randInt(tier.def[0], tier.def[1]) * quality.mult);
-        var baseHp  = Math.floor(randInt(tier.hp[0], tier.hp[1]) * quality.mult);
-
-        // 额外属性浮动（±15%随机波动，让同品质同阶装备也不一样）
-        var variance = 0.85 + Math.random() * 0.3;
-
-        var equip = {
-            id: this.nextId++,
-            name: equipName,
-            quality: qualityIndex,
-            slot: slotIndex,
-            baseAtk: Math.floor(baseAtk * variance),
-            baseDef: Math.floor(baseDef * variance),
-            baseHp:  Math.floor(baseHp * variance),
-            atk: Math.floor(baseAtk * variance),
-            def: Math.floor(baseDef * variance),
-            hp:  Math.floor(baseHp * variance),
-            enhance: 0,
-            tier: tierIndex,
-            mapIndex: mapIndex,
-            effects: this.rollEffects(qualityIndex),
-            setName: setName,
-            setSlotName: setSlotName,
-        };
-
-        return equip;
+        return this._generateEquipRaw(tierIndex, qualityIndex);
     },
 
     /* ----------------------------------------------------------
@@ -333,7 +273,7 @@ var Equipment = {
         }
     },
 
-    /** 生成指定品质倾向的装备 */
+    /** 生成指定品质倾向的装备（使用随机名称系统） */
     generateEquipWithQuality: function (mapIndex, targetQuality) {
         var tierIndex = mapIndex;
         var tier = this.EQUIP_TIERS[tierIndex];
@@ -351,7 +291,22 @@ var Equipment = {
             qualityIndex = randInt(0, this.QUALITIES.length - 1);
         }
 
-        var slotIndex = randInt(0, 5);
+        // 复用 generateEquip 的随机名+词条逻辑
+        var equipment = this._generateEquipRaw(tierIndex, qualityIndex);
+        return equipment;
+    },
+
+    /**
+     * 生成装备的核心逻辑（随机名称 + 词条 + 属性波动）
+     * @param {number} tierIndex
+     * @param {number} qualityIndex
+     * @param {number} slotIndex - 可选，不传则随机
+     */
+    _generateEquipRaw: function (tierIndex, qualityIndex, slotIndex) {
+        var tier = this.EQUIP_TIERS[tierIndex];
+        if (slotIndex === undefined || slotIndex === null) {
+            slotIndex = randInt(0, 5);
+        }
         var quality = this.QUALITIES[qualityIndex];
         var slot = this.SLOTS[slotIndex];
 
@@ -365,32 +320,36 @@ var Equipment = {
             setSlotName = set.slots[slotIndex];
         }
 
-        var equipName;
-        if (setName && setSlotName) {
-            equipName = quality.name + '·' + setSlotName;
-        } else {
-            equipName = quality.name + '·' + tier.series + tier.names[slotIndex];
-            setSlotName = tier.names[slotIndex];
-        }
+        // 随机名称
+        var prefixArr = this.PREFIX_BY_QUALITY[qualityIndex] || [''];
+        var prefix = prefixArr[randInt(0, prefixArr.length - 1)];
+        var wordBank = this.WORD_BANK[slotIndex];
+        var root = wordBank ? wordBank[randInt(0, wordBank.length - 1)] : '无名';
+        var suffix = this.SLOT_SUFFIX[slotIndex] || '器';
+        var equipName = prefix + root + suffix;
 
+        // 基础属性
         var baseAtk = Math.floor(randInt(tier.atk[0], tier.atk[1]) * quality.mult);
         var baseDef = Math.floor(randInt(tier.def[0], tier.def[1]) * quality.mult);
         var baseHp  = Math.floor(randInt(tier.hp[0], tier.hp[1]) * quality.mult);
+
+        // 额外波动
+        var variance = 0.85 + Math.random() * 0.3;
 
         return {
             id: this.nextId++,
             name: equipName,
             quality: qualityIndex,
             slot: slotIndex,
-            baseAtk: baseAtk,
-            baseDef: baseDef,
-            baseHp:  baseHp,
-            atk: baseAtk,
-            def: baseDef,
-            hp:  baseHp,
+            baseAtk: Math.floor(baseAtk * variance),
+            baseDef: Math.floor(baseDef * variance),
+            baseHp:  Math.floor(baseHp * variance),
+            atk: Math.floor(baseAtk * variance),
+            def: Math.floor(baseDef * variance),
+            hp:  Math.floor(baseHp * variance),
             enhance: 0,
             tier: tierIndex,
-            mapIndex: mapIndex,
+            mapIndex: tierIndex,
             effects: this.rollEffects(qualityIndex),
             setName: setName,
             setSlotName: setSlotName,

@@ -480,6 +480,13 @@ body {
     80% { transform: translateX(2px); }
 }
 
+/* 秘境伤害飘字 */
+@keyframes dmgFloat {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    60% { opacity: 1; transform: translateY(-30px) scale(1.1); }
+    100% { opacity: 0; transform: translateY(-50px) scale(0.8); }
+}
+
 /* 战力飘浮动效 */
 @keyframes powerFloatUp {
     0% { opacity: 0; transform: translateX(-50%) translateY(0) scale(0.5); }
