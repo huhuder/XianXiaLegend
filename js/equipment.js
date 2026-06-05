@@ -141,20 +141,45 @@ var Equipment = {
     SET_CHANCE: 0.30,
 
     /* ----------------------------------------------------------
-       特殊效果常量
+       特殊效果常量（扩展版 — 加入更多随机词条）
        ---------------------------------------------------------- */
     EFFECTS: [
-        { name: '暴击率',   key: 'critRate',   min: 2,  max: 8,   desc: '+%d%暴击率' },
-        { name: '闪避率',   key: 'dodgeRate',  min: 2,  max: 6,   desc: '+%d%概率闪避' },
-        { name: '吸血',     key: 'lifesteal',   min: 3,  max: 10,  desc: '伤害的%d%转化为生命' },
-        { name: '经验加成', key: 'expBonus',    min: 5,  max: 20,  desc: '获得经验+%d%' },
-        { name: '灵石加成', key: 'spiritBonus', min: 5,  max: 20,  desc: '获得灵石+%d%' },
-        { name: '修炼速度', key: 'cultSpeed',   min: 5,  max: 15,  desc: '修炼速度+%d%' },
-        { name: 'BOSS增伤', key: 'bossDmg',    min: 10, max: 30,  desc: '对BOSS伤害+%d%' },
-        { name: '反击',     key: 'counterRate', min: 10, max: 25,  desc: '受击时%d%概率反击' },
+        // 普通词条（可出现在凡品以上）
+        { name: '暴击率',   key: 'critRate',   min: 2,  max: 8,   desc: '+%d%暴击率', rarity: 'common' },
+        { name: '闪避率',   key: 'dodgeRate',  min: 2,  max: 6,   desc: '+%d%概率闪避', rarity: 'common' },
+        { name: '吸血',     key: 'lifesteal',   min: 3,  max: 10,  desc: '伤害的%d%转化为生命', rarity: 'common' },
+        { name: '经验加成', key: 'expBonus',    min: 5,  max: 20,  desc: '获得经验+%d%', rarity: 'common' },
+        { name: '灵石加成', key: 'spiritBonus', min: 5,  max: 20,  desc: '获得灵石+%d%', rarity: 'common' },
+        { name: '修炼速度', key: 'cultSpeed',   min: 5,  max: 15,  desc: '修炼速度+%d%', rarity: 'common' },
+        { name: 'BOSS增伤', key: 'bossDmg',    min: 10, max: 30,  desc: '对BOSS伤害+%d%', rarity: 'common' },
+        { name: '反击',     key: 'counterRate', min: 10, max: 25,  desc: '受击时%d%概率反击', rarity: 'common' },
+        // 稀有词条（仅极品以上）
+        { name: '击杀回血', key: 'killHeal',   min: 5,  max: 15,  desc: '击杀怪物回复%d%生命', rarity: 'rare' },
+        { name: '破甲',     key: 'armorBreak', min: 10, max: 25,  desc: '无视目标%d%防御', rarity: 'rare' },
+        { name: '狂暴',     key: 'berserk',    min: 15, max: 30,  desc: '生命低于30%时攻击+%d%', rarity: 'rare' },
+        { name: '荆棘',     key: 'thorn',      min: 15, max: 30,  desc: '受击时反弹%d%伤害', rarity: 'rare' },
+        { name: '神力',     key: 'power',      min: 5,  max: 15,  desc: '攻击力+%d%', rarity: 'rare' },
+        // 史诗词条（仅仙品以上）
+        { name: '连击',     key: 'doubleHit',  min: 5,  max: 15,  desc: '%d%概率攻击两次', rarity: 'epic' },
+        { name: '嗜血',     key: 'bloodthirst',min: 3,  max: 8,   desc: '暴击时回复%d%生命', rarity: 'epic' },
+        { name: '护盾',     key: 'shieldOnHit',min: 5,  max: 15,  desc: '攻击时获得%d%护盾', rarity: 'epic' },
+        // 传说词条（仅神器）
+        { name: '重生',     key: 'revive',     min: 1,  max: 1,   desc: '战斗中有一次机会免疫死亡', rarity: 'legendary' },
+        { name: '毁灭',     key: 'devastate',  min: 20, max: 40,  desc: '暴击伤害+%d%', rarity: 'legendary' },
+        { name: '吸星',     key: 'manaSteal',  min: 5,  max: 10,  desc: '攻击偷取%d%攻击力', rarity: 'legendary' },
     ],
 
-    /* 品质对应的效果数量：[最小, 最大] */
+    /* 品质对应可选词条稀有度（索引: 品质等级） */
+    QUALITY_EFFECT_RARITY: [
+        [],                                              // 凡品: 无
+        ['common'],                                      // 良品: 普通
+        ['common'],                                      // 上品: 普通
+        ['common', 'rare'],                              // 极品: 普通+稀有
+        ['common', 'rare', 'epic'],                      // 仙品: 普通+稀有+史诗
+        ['common', 'rare', 'epic', 'legendary'],         // 神器: 全部
+    ],
+
+    /* 品质对应的效果数量：[最小, 最大]（按稀有度加权） */
     QUALITY_EFFECT_COUNT: [
         0,  // 凡品
         1,  // 良品
@@ -165,29 +190,42 @@ var Equipment = {
     ],
 
     /* ----------------------------------------------------------
-       名称词库
+       名称词库（扩展版 — 每个部位更多随机名）
        ---------------------------------------------------------- */
     WORD_BANK: {
-        0: ['青冥剑', '紫电剑', '玄铁剑', '龙骨刃', '赤霄', '太阿'],
-        1: ['紫金冠', '星辰冠', '龙鳞盔', '凤翅冠'],
-        2: ['天蚕衣', '玄武甲', '金缕衣', '流云袍'],
-        3: ['乾坤戒', '须弥戒', '灵犀戒'],
-        4: ['玉龙坠', '星辰链'],
-        5: ['踏云靴', '追风履'],
+        0: ['青冥', '紫电', '玄铁', '龙骨', '赤霄', '太阿', '霜寒', '炎阳', '破晓', '暗影'],
+        1: ['紫金', '星辰', '龙鳞', '凤翅', '玄天', '碧落', '赤焰', '寒冰'],
+        2: ['天蚕', '玄武', '金缕', '流云', '陨星', '凤羽', '龙鳞', '玄冰'],
+        3: ['乾坤', '须弥', '灵犀', '通灵', '轮回', '九天', '太虚'],
+        4: ['玉龙', '星辰', '凤鸣', '碧波', '青鸾', '月华', '天星'],
+        5: ['踏云', '追风', '御风', '腾龙', '凌霄', '步天', '飞星'],
+    },
+
+    /** 槽位对应的名称后缀 */
+    SLOT_SUFFIX: ['剑', '冠', '衣', '戒', '坠', '靴'],
+
+    /** 前缀（品质相关） */
+    PREFIX_BY_QUALITY: {
+        0: ['破旧的', '陈旧的', '普通的'],
+        1: ['锋利的', '精致的', '灵动的'],
+        2: ['上等的', '稀有的', '华美的'],
+        3: ['无瑕的', '璀璨的', '绝妙的'],
+        4: ['仙蕴的', '灵韵的', '天成的'],
+        5: ['混沌的', '不朽的', '灭世的'],
     },
 
     /** 装备自增 ID */
     nextId: 1,
 
     /* ----------------------------------------------------------
-       生成随机装备
+       生成随机装备（重写 — 随机名称 + 丰富词条）
        @param {number} mapIndex - 地图索引
        ---------------------------------------------------------- */
     generateEquip: function (mapIndex) {
         var tierIndex = mapIndex;
         var tier = this.EQUIP_TIERS[tierIndex];
 
-        // 随机品质（按 Tier 品质率）
+        // 随机品质
         var qualityIndex = 0;
         var roll = Math.random() * 100;
         var cumulative = 0;
@@ -204,7 +242,7 @@ var Equipment = {
         var quality = this.QUALITIES[qualityIndex];
         var slot = this.SLOTS[slotIndex];
 
-        // 套装判定：约30%概率附带套装标签
+        // 套装判定
         var setName = null;
         var setSlotName = null;
         if (Math.random() < this.SET_CHANCE) {
@@ -214,31 +252,39 @@ var Equipment = {
             setSlotName = set.slots[slotIndex];
         }
 
-        // 名称：[品质]·[套装件名] 或 [品质]·[系列][部位名]
+        // 生成随机名称：前缀 + 词根 + 后缀
+        var prefixArr = this.PREFIX_BY_QUALITY[qualityIndex] || [''];
+        var prefix = prefixArr[randInt(0, prefixArr.length - 1)];
+        var wordBank = this.WORD_BANK[slotIndex];
+        var root = wordBank ? wordBank[randInt(0, wordBank.length - 1)] : '无名';
+        var suffix = this.SLOT_SUFFIX[slotIndex] || '器';
+
         var equipName;
         if (setName && setSlotName) {
             equipName = quality.name + '·' + setSlotName;
         } else {
-            equipName = quality.name + '·' + tier.series + tier.names[slotIndex];
-            setSlotName = tier.names[slotIndex];
+            equipName = prefix + root + suffix;
         }
 
-        // 基础属性从 Tier 范围随机 × 品质倍率
+        // 基础属性随机 + 品质倍率
         var baseAtk = Math.floor(randInt(tier.atk[0], tier.atk[1]) * quality.mult);
         var baseDef = Math.floor(randInt(tier.def[0], tier.def[1]) * quality.mult);
         var baseHp  = Math.floor(randInt(tier.hp[0], tier.hp[1]) * quality.mult);
+
+        // 额外属性浮动（±15%随机波动，让同品质同阶装备也不一样）
+        var variance = 0.85 + Math.random() * 0.3;
 
         var equip = {
             id: this.nextId++,
             name: equipName,
             quality: qualityIndex,
             slot: slotIndex,
-            baseAtk: baseAtk,
-            baseDef: baseDef,
-            baseHp:  baseHp,
-            atk: baseAtk,
-            def: baseDef,
-            hp:  baseHp,
+            baseAtk: Math.floor(baseAtk * variance),
+            baseDef: Math.floor(baseDef * variance),
+            baseHp:  Math.floor(baseHp * variance),
+            atk: Math.floor(baseAtk * variance),
+            def: Math.floor(baseDef * variance),
+            hp:  Math.floor(baseHp * variance),
             enhance: 0,
             tier: tierIndex,
             mapIndex: mapIndex,
@@ -352,7 +398,7 @@ var Equipment = {
     },
 
     /* ----------------------------------------------------------
-       随机生成特殊效果
+       随机生成特殊效果（按品质限制稀有度）
        @param {number} qualityIndex - 品质索引
        ---------------------------------------------------------- */
     rollEffects: function (qualityIndex) {
@@ -362,34 +408,51 @@ var Equipment = {
         // 品质 → [最小条数, 最大条数]
         var minCount, maxCount;
 
-        if (qualityIndex === 0) { minCount = 0; maxCount = 0; }           // 凡品: 0
-        else if (qualityIndex === 1) { minCount = 1; maxCount = 1; }      // 良品: 1
-        else if (qualityIndex === 2) { minCount = 1; maxCount = 1; }      // 上品: 1
-        else if (qualityIndex === 3) { minCount = 1; maxCount = 2; }      // 极品: 1~2
-        else if (qualityIndex === 4) { minCount = 2; maxCount = 2; }      // 仙品: 2
-        else if (qualityIndex === 5) { minCount = 2; maxCount = 3; }      // 神器: 2~3
+        if (qualityIndex === 0) { minCount = 0; maxCount = 0; }
+        else if (qualityIndex === 1) { minCount = 1; maxCount = 1; }
+        else if (qualityIndex === 2) { minCount = 1; maxCount = 1; }
+        else if (qualityIndex === 3) { minCount = 1; maxCount = 2; }
+        else if (qualityIndex === 4) { minCount = 2; maxCount = 2; }
+        else if (qualityIndex === 5) { minCount = 2; maxCount = 3; }
         else { minCount = 0; maxCount = 0; }
 
         var count = randInt(minCount, maxCount);
         if (count <= 0) return [];
 
+        // 按品质限制可选的稀有度
+        var allowedRarities = this.QUALITY_EFFECT_RARITY[qualityIndex] || ['common'];
+        var pool = [];
+        for (var pi = 0; pi < this.EFFECTS.length; pi++) {
+            if (allowedRarities.indexOf(this.EFFECTS[pi].rarity) >= 0) {
+                pool.push(this.EFFECTS[pi]);
+            }
+        }
+
         var qualityMult = this.QUALITIES[qualityIndex].mult;
         var effects = [];
-        var pool = this.EFFECTS.slice(); // 复制池子
 
         for (var i = 0; i < count; i++) {
             if (pool.length === 0) break;
             var idx = randInt(0, pool.length - 1);
             var efDef = pool[idx];
-            // 数值 = 随机范围 × 品质倍率，取整
+
+            // 随机取词条值
             var rawVal = randInt(efDef.min, efDef.max);
-            var val = Math.max(efDef.min, Math.floor(rawVal * qualityMult * 0.5 + rawVal * 0.5));
+            // 品质倍率加成（高品质词条数值更高）
+            var val = Math.floor(rawVal * (0.6 + qualityMult * 0.4));
+            val = Math.max(efDef.min, Math.min(val, efDef.max * 2));
+
+            // 稀有词条概率上浮20%
+            if (efDef.rarity === 'legendary' && Math.random() < 0.3) {
+                val = Math.floor(val * 1.5);
+            }
+
             effects.push({
                 name: efDef.name,
                 key: efDef.key,
                 value: val,
+                rarity: efDef.rarity,
             });
-            // 不允许重复效果
             pool.splice(idx, 1);
         }
 
@@ -407,7 +470,10 @@ var Equipment = {
         var result = {
             critRate: 0, dodgeRate: 0, lifesteal: 0, bossDmg: 0, counterRate: 0,
             extraDmgPct: 0, extraDmgChance: 0, dmgReducePct: 0, dmgReduceChance: 0,
-            killHealPct: 0, expBonus: 0, spiritBonus: 0, cultSpeed: 0
+            killHealPct: 0, expBonus: 0, spiritBonus: 0, cultSpeed: 0,
+            // 新增词条
+            killHeal: 0, armorBreak: 0, berserk: 0, thorn: 0, power: 0,
+            doubleHit: 0, bloodthirst: 0, shieldOnHit: 0, revive: 0, devastate: 0, manaSteal: 0,
         };
 
         // 遍历已装备的6个槽位
@@ -507,13 +573,17 @@ var Equipment = {
         var q = this.QUALITIES[equip.quality];
         var s = this.SLOTS[equip.slot];
 
-        // 构建效果文本
+        // 构建效果文本（带稀有度颜色）
         var effectsHtml = '';
         if (equip.effects && equip.effects.length > 0) {
-            effectsHtml = '<div style="font-size:12px;color:#ffd700;margin-top:6px;line-height:1.7;">';
+            effectsHtml = '<div style="font-size:12px;margin-top:6px;line-height:1.7;">';
             for (var i = 0; i < equip.effects.length; i++) {
                 var ef = equip.effects[i];
-                effectsHtml += '✨ ' + ef.name + ' +' + ef.value + '%<br>';
+                var rarityColor = '#ffd700';
+                if (ef.rarity === 'rare') rarityColor = '#3399ff';
+                else if (ef.rarity === 'epic') rarityColor = '#cc33ff';
+                else if (ef.rarity === 'legendary') rarityColor = '#ff4444';
+                effectsHtml += '<div style="color:' + rarityColor + ';">✦ ' + ef.name + ' +' + ef.value + '%</div>';
             }
             effectsHtml += '</div>';
         }
@@ -877,8 +947,14 @@ var Equipment = {
                 '<div style="font-size:13px;color:#ffd700;font-weight:bold;margin-bottom:6px;">特殊效果</div>';
             for (var i = 0; i < equip.effects.length; i++) {
                 var ef = equip.effects[i];
-                effectsHtml += '<div style="font-size:12px;color:#ffd700;padding:3px 0;border-bottom:1px solid rgba(255,215,0,0.1);">' +
-                    '✦ ' + ef.name + ' +' + ef.value + '%</div>';
+                var rarityColor = '#ffd700';
+                var rarityTag = '普通';
+                if (ef.rarity === 'rare') { rarityColor = '#3399ff'; rarityTag = '稀有'; }
+                else if (ef.rarity === 'epic') { rarityColor = '#cc33ff'; rarityTag = '史诗'; }
+                else if (ef.rarity === 'legendary') { rarityColor = '#ff4444'; rarityTag = '传说'; }
+                effectsHtml += '<div style="font-size:12px;color:' + rarityColor + ';padding:3px 0;border-bottom:1px solid rgba(255,215,0,0.1);display:flex;justify-content:space-between;">' +
+                    '<span>✦ ' + ef.name + ' +' + ef.value + '%</span>' +
+                    '<span style="font-size:10px;color:' + rarityColor + ';opacity:0.8;">' + rarityTag + '</span></div>';
             }
             effectsHtml += '</div>';
         } else {
