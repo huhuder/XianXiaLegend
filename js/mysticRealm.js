@@ -30,18 +30,18 @@ var MysticRealm = (function () {
        layerWithinRealm: 层内难度 0=简单 1=普通 2=困难
        =========================================== */
     function getRealmEnemyStats(realmIndex, layerWithinRealm) {
-        // 基础属性（境界0·简单难度，与凡人期满层玩家等比校准）
-        var baseHp = 600;
-        var baseAtk = 250;
-        var baseDef = 250;
+        // 基础属性（校准至玩家凡人期可打的合理范围）
+        var baseHp = 100;
+        var baseAtk = 15;
+        var baseDef = 8;
 
-        // 境界系数：每个境界翻倍（指数增长，realmIndex=0 → mult=1）
-        var realmMult = Math.pow(2, realmIndex);
+        // 境界系数：每个境界递增（比玩家属性增长稍慢，保持可挑战）
+        var realmMult = Math.pow(1.6, realmIndex);
 
         // 层内难度系数：简单/普通/困难
-        var hpMult  = [1.0, 1.5, 2.2];
-        var atkMult = [1.0, 1.4, 1.8];
-        var defMult = [1.0, 1.3, 1.6];
+        var hpMult  = [1.0, 1.6, 2.5];
+        var atkMult = [1.0, 1.4, 1.9];
+        var defMult = [1.0, 1.3, 1.7];
 
         // 随机波动 ±5%
         var rnd = 0.95 + Math.random() * 0.1;
@@ -807,42 +807,21 @@ var MysticRealm = (function () {
             }
         }
 
-        var pAtk = Math.floor((Game.data.attack || 10) * (1 + totalAtkPct / 100));
-        var pDef = Math.floor((Game.data.defense || 5) * (1 + totalDefPct / 100));
-        var pMaxHp = Math.floor((Game.data.hp || 100) * (1 + totalHpPct / 100));
+        // 复用 Cultivation 的统一属性计算（与挂机战斗同源）
+        var effectiveStats = (typeof Cultivation !== 'undefined' && Cultivation.getEffectiveStats)
+            ? Cultivation.getEffectiveStats()
+            : { atk: 10, def: 5, hp: 100, critRate: 0.05 };
 
-        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
-            var beastBonus = Beast.getActiveBeastBonus();
-            pAtk += beastBonus.atk;
-            pDef += beastBonus.def;
-        }
+        var pAtk = effectiveStats.atk;
+        var pDef = effectiveStats.def;
+        var pMaxHp = effectiveStats.hp;
+        var totalCritRate = effectiveStats.critRate;
 
-        var totalCritRate = (Game.data.critRate || 0);
-        var equipped = Game.data.equipped || [];
-        for (var ei = 0; ei < equipped.length; ei++) {
-            var eq = equipped[ei];
-            if (eq && eq.effects) {
-                for (var ej = 0; ej < eq.effects.length; ej++) {
-                    if (eq.effects[ej].key === 'critRate') totalCritRate += eq.effects[ej].value / 100;
-                }
-            }
-        }
-        if (typeof Equipment !== 'undefined') {
-            var setBonuses2 = Equipment.getActiveSetBonuses();
-            for (var sk = 0; sk < setBonuses2.length; sk++) {
-                if (setBonuses2[sk].effects.critRate) totalCritRate += setBonuses2[sk].effects.critRate / 100;
-            }
-        }
-        if (typeof Talents !== 'undefined') totalCritRate += Talents.getEffects().critRate / 100;
-        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
-            var beastCritRate = Beast.getActiveBeastBonus().critRate || 0;
-            if (beastCritRate > 0) totalCritRate += beastCritRate / 100;
-        }
-
-        // 玩家攻击
-        var pDmg = Math.max(1, pAtk - enemyData.def * 0.5 + Math.floor(Math.random() * 6));
+        // 玩家攻击（与挂机战斗公式对齐：atk * 随机 ±20% - 怪物防御 * 0.3）
+        var pRaw = pAtk * (0.8 + Math.random() * 0.4);
+        var pDmg = Math.max(1, Math.floor(pRaw - enemyData.def * 0.3));
         var crit = Math.random() < totalCritRate;
-        if (crit) pDmg = Math.floor(pDmg * 1.8);
+        if (crit) pDmg = Math.floor(pDmg * 1.5);
 
         enemyData.hp -= pDmg;
 
@@ -881,8 +860,8 @@ var MysticRealm = (function () {
             return;
         }
 
-        // 敌人反击
-        var eDmg = Math.max(1, enemyData.atk - pDef * 0.4 + Math.floor(Math.random() * 4));
+        // 敌人反击（与挂机战斗公式对齐：怪物atk * 随机 - 玩家防御 * 0.3）
+        var eDmg = Math.max(1, Math.floor(enemyData.atk * (0.9 + Math.random() * 0.2) - pDef * 0.3));
         if (Game.data.skillShield && Game.data.skillShield > 0) {
             var absorbed = Math.min(Game.data.skillShield, eDmg);
             Game.data.skillShield -= absorbed;

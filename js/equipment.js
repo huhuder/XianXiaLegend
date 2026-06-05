@@ -714,6 +714,19 @@ var Equipment = {
                     'background:rgba(15,52,96,0.4);box-shadow:0 0 8px ' + q.color + '22;cursor:pointer;' +
                     'transition:all 0.2s;position:relative;overflow:hidden;';
 
+                // 计算战力对比（新装备vs已装备）
+                var powerCompareHtml = '';
+                var newPower = eq.atk * 3 + eq.def * 2 + eq.hp * 0.5;
+                var oldPower = 0;
+                var equipped = Game.data.equipped[eq.slot];
+                if (equipped) {
+                    oldPower = equipped.atk * 3 + equipped.def * 2 + equipped.hp * 0.5;
+                }
+                var powerDiff = Math.floor(newPower - oldPower);
+                var powerColor = powerDiff > 0 ? '#2ecc71' : (powerDiff < 0 ? '#e74c3c' : '#888');
+                var powerText = equipped ? (powerDiff > 0 ? '↑+' + powerDiff : (powerDiff < 0 ? '↓' + powerDiff : '=0')) : 'NEW';
+                var powerLabel = equipped ? '战力对比' : '预估战力';
+
                 cardEl.innerHTML =
                     '<div style="display:flex;align-items:center;gap:10px;">' +
                         '<div style="font-size:24px;min-width:32px;text-align:center;">' + s.icon + '</div>' +
@@ -725,9 +738,14 @@ var Equipment = {
                                 '<span style="font-size:12px;color:' + q.color + ';">🛡️+' + eq.def + '</span>' +
                                 '<span style="font-size:12px;color:' + q.color + ';">❤️+' + eq.hp + '</span>' +
                             '</div>' +
+                            '<div style="font-size:11px;margin-top:4px;color:' + powerColor + ';">' + powerLabel + '：<strong>' + powerText + '</strong></div>' +
                             compareHtml +
                         '</div>' +
                         '<div style="display:flex;flex-direction:column;gap:6px;">' +
+                            '<button class="inv-equip-btn" data-idx="' + idx + '" style="padding:6px 14px;border:1px solid ' + q.color + ';border-radius:6px;background:rgba(0,0,0,0.3);color:' + q.color + ';font-size:12px;cursor:pointer;white-space:nowrap;transition:all 0.15s;">装备</button>' +
+                            '<button class="inv-sell-btn" data-idx="' + idx + '" style="padding:4px 10px;border:1px solid #555;border-radius:6px;background:rgba(0,0,0,0.3);color:#888;font-size:11px;cursor:pointer;transition:all 0.15s;">出售</button>' +
+                        '</div>' +
+                    '</div>';
                             '<button class="inv-equip-btn" data-idx="' + idx + '" style="padding:6px 14px;border:1px solid ' + q.color + ';border-radius:6px;background:rgba(0,0,0,0.3);color:' + q.color + ';font-size:12px;cursor:pointer;white-space:nowrap;transition:all 0.15s;">装备</button>' +
                             '<button class="inv-sell-btn" data-idx="' + idx + '" style="padding:4px 10px;border:1px solid #555;border-radius:6px;background:rgba(0,0,0,0.3);color:#888;font-size:11px;cursor:pointer;transition:all 0.15s;">出售</button>' +
                         '</div>' +

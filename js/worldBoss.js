@@ -5,32 +5,50 @@
 
 var WORLD_BOSSES = [
     { name: '千年蛇妖', realmRequired: 2, respawnHours: 2,
-      rewardStones: 500, rewardContribution: 50, killReward: { stones: 1000, contribution: 100 } },
+      rewardStones: 500, rewardContribution: 50, killReward: { stones: 1000, contribution: 100 },
+      baseHp: 2500, baseAtk: 150, baseDef: 80 },
     { name: '万年尸王', realmRequired: 3, respawnHours: 4,
-      rewardStones: 1200, rewardContribution: 100, killReward: { stones: 2500, contribution: 200 } },
+      rewardStones: 1200, rewardContribution: 100, killReward: { stones: 2500, contribution: 200 },
+      baseHp: 6000, baseAtk: 350, baseDef: 200 },
     { name: '远古魔龙', realmRequired: 4, respawnHours: 6,
-      rewardStones: 3000, rewardContribution: 200, killReward: { stones: 6000, contribution: 400 } },
+      rewardStones: 3000, rewardContribution: 200, killReward: { stones: 6000, contribution: 400 },
+      baseHp: 15000, baseAtk: 800, baseDef: 500 },
     { name: '九尾天狐', realmRequired: 5, respawnHours: 8,
-      rewardStones: 8000, rewardContribution: 400, killReward: { stones: 16000, contribution: 800 } },
+      rewardStones: 8000, rewardContribution: 400, killReward: { stones: 16000, contribution: 800 },
+      baseHp: 35000, baseAtk: 1800, baseDef: 1200 },
     { name: '混世魔尊', realmRequired: 6, respawnHours: 12,
-      rewardStones: 20000, rewardContribution: 800, killReward: { stones: 40000, contribution: 1600 } },
+      rewardStones: 20000, rewardContribution: 800, killReward: { stones: 40000, contribution: 1600 },
+      baseHp: 80000, baseAtk: 4200, baseDef: 2800 },
     { name: '灭世龙皇', realmRequired: 7, respawnHours: 16,
-      rewardStones: 50000, rewardContribution: 1600, killReward: { stones: 100000, contribution: 3200 } },
+      rewardStones: 50000, rewardContribution: 1600, killReward: { stones: 100000, contribution: 3200 },
+      baseHp: 180000, baseAtk: 10000, baseDef: 6500 },
     { name: '天道化身', realmRequired: 8, respawnHours: 24,
-      rewardStones: 120000, rewardContribution: 3200, killReward: { stones: 250000, contribution: 6400 } }
+      rewardStones: 120000, rewardContribution: 3200, killReward: { stones: 250000, contribution: 6400 },
+      baseHp: 400000, baseAtk: 22000, baseDef: 15000 }
 ];
 
 /**
- * 动态计算世界Boss属性（基于玩家有效属性）
+ * 动态计算世界Boss属性（独立基础模板 + 玩家境界补偿）
  * @param {number} bossIndex — WORLD_BOSSES 索引
  * @returns {{ hp: number, atk: number, def: number }}
  */
 function getBossStats(bossIndex) {
+    var boss = WORLD_BOSSES[bossIndex];
     var playerEff = Cultivation.getEffectiveStats();
+
+    // 用玩家境界做补偿系数：高境界玩家打低级Boss时补偿
+    var playerPower = playerEff.hp * 0.5 + playerEff.atk * 2.5 + playerEff.def * 1.8;
+    var bossPower = boss.baseHp * 0.5 + boss.baseAtk * 2.5 + boss.baseDef * 1.8;
+    var scale = 1.0;
+    if (playerPower > bossPower * 1.5) {
+        scale = 1.0 + (playerPower / bossPower - 1.5) * 0.15;
+        scale = Math.min(scale, 3.0);
+    }
+
     return {
-        hp: Math.floor(playerEff.hp * 8.0),
-        atk: Math.floor(playerEff.atk * 0.8),
-        def: Math.floor(playerEff.def * 0.7)
+        hp: Math.floor(boss.baseHp * scale),
+        atk: Math.floor(boss.baseAtk * scale),
+        def: Math.floor(boss.baseDef * scale)
     };
 }
 
@@ -569,71 +587,25 @@ var WorldBoss = {
         var d = Game.data;
 
         // 计算玩家属性（含宗门Buff + activeBuffs + 天赋 + 套装 + 技能Buff）
-        var sectBonus = typeof Sect !== 'undefined' ? Sect.getSectBonus() : { atkPct: 0, defPct: 0 };
-        var activeBuffs = typeof Sect !== 'undefined' ? Sect.getActiveBuffs() : { atkPct: 0, defPct: 0 };
-        var talentEff = typeof Talents !== 'undefined' ? Talents.getEffects() : { atkPct: 0, defPct: 0, critRate: 0 };
-        var skillAtkBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_atk') : 0;
-        var skillAllBuff = (typeof Skills !== 'undefined') ? Skills.getBuffValue('buff_all') : 0;
-        var totalAtkPct = sectBonus.atkPct + activeBuffs.atkPct + talentEff.atkPct + skillAtkBuff + skillAllBuff;
-        var totalDefPct = sectBonus.defPct + activeBuffs.defPct + talentEff.defPct + skillAllBuff;
+        // 复用 Cultivation 统一属性计算（与挂机战斗同源）
+        var effectiveStats = (typeof Cultivation !== 'undefined' && Cultivation.getEffectiveStats)
+            ? Cultivation.getEffectiveStats()
+            : { atk: 10, def: 5, hp: 100, critRate: 0.05 };
 
-        // 套装加成
-        if (typeof Equipment !== 'undefined') {
-            var setBonuses = Equipment.getActiveSetBonuses();
-            for (var si = 0; si < setBonuses.length; si++) {
-                var se = setBonuses[si].effects;
-                if (se.atkPct) totalAtkPct += se.atkPct;
-                if (se.defPct) totalDefPct += se.defPct;
-            }
-        }
+        var playerAtk = effectiveStats.atk;
+        var playerDef = effectiveStats.def;
+        var totalCritRate = effectiveStats.critRate;
 
-        var atkMult = 1 + totalAtkPct / 100;
-        var defMult = 1 + totalDefPct / 100;
-
-        var playerAtk = Math.floor(d.attack * atkMult);
-        var playerDef = Math.floor(d.defense * defMult);
-
-        // 灵兽出战加成（11-4批）
-        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
-            var beastBonus = Beast.getActiveBeastBonus();
-            playerAtk += beastBonus.atk;
-            playerDef += beastBonus.def;
-        }
-
-        // 动态暴击率：基础 + 装备效果 + 套装 + 天赋
-        var totalCritRate = (d.critRate || 0);
-        var equipped = d.equipped || [];
-        for (var ei = 0; ei < equipped.length; ei++) {
-            var eq = equipped[ei];
-            if (eq && eq.effects) {
-                for (var ej = 0; ej < eq.effects.length; ej++) {
-                    if (eq.effects[ej].key === 'critRate') totalCritRate += eq.effects[ej].value / 100;
-                }
-            }
-        }
-        if (typeof Equipment !== 'undefined') {
-            var setBonuses2 = Equipment.getActiveSetBonuses();
-            for (var sk2 = 0; sk2 < setBonuses2.length; sk2++) {
-                if (setBonuses2[sk2].effects.critRate) totalCritRate += setBonuses2[sk2].effects.critRate / 100;
-            }
-        }
-        totalCritRate += talentEff.critRate / 100;
-        // 灵兽暴击率加成
-        if (typeof Beast !== 'undefined' && Beast.getActiveBeastBonus) {
-            var beastCritRate = Beast.getActiveBeastBonus().critRate || 0;
-            if (beastCritRate > 0) totalCritRate += beastCritRate / 100;
-        }
-
-        // 玩家伤害：max(1, 玩家ATK * (0.8~1.2随机) - BossDEF * 0.3)，暴击1.5倍
+        // 玩家伤害：与挂机战斗公式对齐
         var playerRaw = playerAtk * (0.8 + Math.random() * 0.4);
         var isCrit = Math.random() < totalCritRate;
         var bossStatsTick = getBossStats(this.battleBossIndex);
         var playerDmg = Math.max(1, Math.floor(playerRaw - bossStatsTick.def * 0.3));
         if (isCrit) playerDmg = Math.floor(playerDmg * 1.5);
 
-        // Boss伤害：max(1, BossATK * (0.8~1.2随机) - 玩家DEF * 0.4)
-        var bossRaw = bossStatsTick.atk * (0.8 + Math.random() * 0.4);
-        var bossDmg = Math.max(1, Math.floor(bossRaw - playerDef * 0.4));
+        // Boss伤害：与挂机战斗公式对齐
+        var bossRaw = bossStatsTick.atk * (0.9 + Math.random() * 0.2);
+        var bossDmg = Math.max(1, Math.floor(bossRaw - playerDef * 0.3));
 
         // 技能护盾吸收
         if (Game.data.skillShield && Game.data.skillShield > 0) {

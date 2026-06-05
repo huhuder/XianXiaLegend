@@ -433,9 +433,32 @@ var Game = {
     },
 
     /** 更新战力显示 */
+    _lastPower: -1,
     updatePower: function () {
         if (this.dom.powerValue) {
-            this.dom.powerValue.textContent = formatNumber(this.calcPower());
+            var newPower = this.calcPower();
+            var oldPower = this._lastPower;
+            this._lastPower = newPower;
+            this.dom.powerValue.textContent = formatNumber(newPower);
+
+            // 战力变化时显示飘字
+            if (oldPower > 0 && newPower !== oldPower) {
+                var diff = newPower - oldPower;
+                var color = diff > 0 ? '#ffd700' : '#e74c3c';
+                var prefix = diff > 0 ? '⚡战力+' : '战力';
+                var floatEl = document.createElement('div');
+                floatEl.className = 'power-float';
+                floatEl.textContent = prefix + formatNumber(Math.abs(diff));
+                floatEl.style.cssText =
+                    'position:fixed;left:50%;top:45%;transform:translateX(-50%);' +
+                    'font-size:' + (diff > 100 ? '28px' : '22px') + ';font-weight:bold;' +
+                    'color:' + color + ';text-shadow:0 0 20px ' + color + ';' +
+                    'z-index:9998;pointer-events:none;' +
+                    'animation:powerFloatUp 1.2s ease-out forwards;' +
+                    'font-family:STKaiti,KaiTi,serif;letter-spacing:3px;';
+                document.body.appendChild(floatEl);
+                setTimeout(function () { floatEl.remove(); }, 1300);
+            }
         }
     },
 

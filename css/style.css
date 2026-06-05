@@ -480,6 +480,15 @@ body {
     80% { transform: translateX(2px); }
 }
 
+/* 战力飘浮动效 */
+@keyframes powerFloatUp {
+    0% { opacity: 0; transform: translateX(-50%) translateY(0) scale(0.5); }
+    15% { opacity: 1; transform: translateX(-50%) translateY(-10px) scale(1.1); }
+    30% { opacity: 1; transform: translateX(-50%) translateY(-20px) scale(1); }
+    80% { opacity: 1; transform: translateX(-50%) translateY(-50px) scale(0.95); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-70px) scale(0.8); }
+}
+
 /* ============================================================
    属性面板
    ============================================================ */
