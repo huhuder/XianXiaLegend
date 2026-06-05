@@ -133,7 +133,8 @@ var WorldBoss = {
             var bd = Game.data.bossData[i];
             if (bd && !bd.alive && bd.respawnAt && now >= bd.respawnAt) {
                 bd.alive = true;
-                bd.hp = getBossStats(i).hp;
+                bd.hp = WorldBoss._getBaseHp(i);
+                bd.maxHp = bd.hp;
                 bd.respawnAt = null;
                 bd.topDamage = [];
                 changed = true;
@@ -148,19 +149,31 @@ var WorldBoss = {
     _getBossData: function (bossIndex) {
         var boss = WORLD_BOSSES[bossIndex];
         if (!Game.data.bossData[bossIndex]) {
+            // 固定BOSS血量：使用基础值，不依赖玩家属性
+            // 这样不同BOSS的血量天然不同，且不会随玩家境界波动
+            var baseHp = boss.baseHp;
             var stats = getBossStats(bossIndex);
             Game.data.bossData[bossIndex] = {
-                hp: stats.hp,
-                maxHp: stats.hp,  // 保存最大血量，不再动态计算
+                hp: baseHp,           // 使用固定基础血量
+                maxHp: baseHp,
                 alive: true,
                 respawnAt: null,
                 topDamage: []
             };
         } else if (!Game.data.bossData[bossIndex].maxHp) {
-            // 兼容旧存档：补充maxHp字段
-            Game.data.bossData[bossIndex].maxHp = Game.data.bossData[bossIndex].hp;
+            // 兼容旧存档：用基础值修复
+            Game.data.bossData[bossIndex].maxHp = WorldBoss._getBaseHp(bossIndex);
+            Game.data.bossData[bossIndex].hp = Math.min(
+                Game.data.bossData[bossIndex].hp,
+                Game.data.bossData[bossIndex].maxHp
+            );
         }
         return Game.data.bossData[bossIndex];
+    },
+
+    /** 获取BOSS固定基础血量 */
+    _getBaseHp: function (bossIndex) {
+        return WORLD_BOSSES[bossIndex] ? WORLD_BOSSES[bossIndex].baseHp : 1000;
     },
 
     /* ----------------------------------------------------------
