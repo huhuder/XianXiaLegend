@@ -765,11 +765,6 @@ var Game = {
                 }
                 var target = document.getElementById('sub-' + sub);
                 if (target) target.classList.add('active');
-
-                // 切换到秘境时懒加载
-                if (sub === 'realm' && typeof MysticRealm !== 'undefined') {
-                    MysticRealm.render();
-                }
             });
         }
     },
